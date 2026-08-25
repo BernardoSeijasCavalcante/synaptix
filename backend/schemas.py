@@ -1,0 +1,44 @@
+from pydantic import BaseModel
+from typing import List, Optional
+from datetime import datetime
+
+# Notebook Schemas
+class NotebookBase(BaseModel):
+    title: str
+    parent_id: Optional[int] = None
+
+class NotebookCreate(NotebookBase):
+    pass
+
+class NotebookUpdate(NotebookBase):
+    is_active: Optional[bool] = None
+
+class NotebookResponse(NotebookBase):
+    id: int
+    is_active: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Note Schemas
+class NoteBase(BaseModel):
+    title: str
+    content: str
+    notebook_id: Optional[int] = None
+
+class NoteCreate(NoteBase):
+    pass
+
+class NoteUpdate(NoteBase):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    notebook_id: Optional[int] = None
+
+class NoteResponse(NoteBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
