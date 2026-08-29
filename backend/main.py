@@ -129,6 +129,67 @@ def delete_comment(comment_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Comment deleted"}
 
+@app.get("/notebooks/{notebook_id}/comments", response_model=List[schemas.CommentResponse])
+def get_notebook_comments(notebook_id: int, db: Session = Depends(get_db)):
+    # Get all notes for this notebook
+    notes = db.query(models.Note).filter(models.Note.notebook_id == notebook_id).all()
+    note_ids = [note.id for note in notes]
+    
+    # Get all comments for these notes
+    if not note_ids:
+        return []
+    return db.query(models.Comment).filter(models.Comment.note_id.in_(note_ids)).all()
+
+# Comment Connection Endpoints
+@app.post("/comment-connections", response_model=schemas.CommentConnectionResponse)
+def create_comment_connection(connection: schemas.CommentConnectionCreate, db: Session = Depends(get_db)):
+    db_conn = models.CommentConnection(**connection.model_dump())
+    db.add(db_conn)
+    db.commit()
+    db.refresh(db_conn)
+    return db_conn
+
+@app.get("/notebooks/{notebook_id}/comment-connections", response_model=List[schemas.CommentConnectionResponse])
+def get_notebook_connections(notebook_id: int, db: Session = Depends(get_db)):
+    notes = db.query(models.Note).filter(models.Note.notebook_id == notebook_id).all()
+    note_ids = [note.id for note in notes]
+    if not note_ids:
+        return []
+        
+    comments = db.query(models.Comment).filter(models.Comment.note_id.in_(note_ids)).all()
+    comment_ids = [comment.id for comment in comments]
+    if not comment_ids:
+        return []
+        
+    return db.query(models.CommentConnection).filter(
+        models.CommentConnection.source_comment_id.in_(comment_ids) |
+        models.CommentConnection.target_comment_id.in_(comment_ids)
+    ).all()
+
+@app.put("/comment-connections/{conn_id}", response_model=schemas.CommentConnectionResponse)
+def update_comment_connection(conn_id: int, connection: schemas.CommentConnectionUpdate, db: Session = Depends(get_db)):
+    db_conn = db.query(models.CommentConnection).filter(models.CommentConnection.id == conn_id).first()
+    if not db_conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+        
+    update_data = connection.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_conn, key, value)
+        
+    db.commit()
+    db.refresh(db_conn)
+    return db_conn
+
+@app.delete("/comment-connections/{conn_id}")
+def delete_comment_connection(conn_id: int, db: Session = Depends(get_db)):
+    db_conn = db.query(models.CommentConnection).filter(models.CommentConnection.id == conn_id).first()
+    if not db_conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    db.delete(db_conn)
+    db.commit()
+    return {"message": "Connection deleted"}
+
+
 
 @app.post("/analyze")
 def analyze_content(payload: dict):

@@ -20,6 +20,16 @@ export interface Comment {
   note_id: number;
   content: string;
   selected_text: string;
+  x_position?: number | null;
+  y_position?: number | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface CommentConnection {
+  id: number;
+  source_comment_id: number;
+  target_comment_id: number;
+  observation: string | null;
+  created_at: string;
 }

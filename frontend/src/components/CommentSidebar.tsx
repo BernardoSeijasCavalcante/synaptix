@@ -1,18 +1,36 @@
 import React from 'react';
 import { useCommentsStore } from '../store/useCommentsStore';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Network } from 'lucide-react';
+import { CommentBox } from './CommentBox';
 
 interface CommentSidebarProps {
   onHoverComment: (id: number | null) => void;
   hoveredCommentId: number | null;
+  onToggleMindMap: () => void;
+  isMindMapExpanded: boolean;
 }
 
-export const CommentSidebar: React.FC<CommentSidebarProps> = ({ onHoverComment, hoveredCommentId }) => {
+export const CommentSidebar: React.FC<CommentSidebarProps> = ({ 
+  onHoverComment, 
+  hoveredCommentId,
+  onToggleMindMap,
+  isMindMapExpanded
+}) => {
   const { comments, deleteComment, updateComment } = useCommentsStore();
 
   if (comments.length === 0) {
     return (
       <div className="w-80 border-l border-slate-800 bg-[#0a1128] p-4 flex flex-col text-gray-500 overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-gray-300 font-medium">Comentários</h3>
+          <button 
+            onClick={onToggleMindMap}
+            className={`p-1.5 rounded transition-colors ${isMindMapExpanded ? 'bg-purple-600/30 text-purple-400' : 'hover:bg-slate-800 text-gray-400'}`}
+            title="Expandir Mapa Mental"
+          >
+            <Network size={18} />
+          </button>
+        </div>
         <p className="text-sm text-center mt-10">Nenhum comentário nesta nota.</p>
       </div>
     );
@@ -20,7 +38,17 @@ export const CommentSidebar: React.FC<CommentSidebarProps> = ({ onHoverComment, 
 
   return (
     <div className="w-80 h-full border-l border-slate-800 bg-[#0a1128] p-4 flex flex-col gap-4 overflow-y-auto" id="comment-sidebar">
-      <h3 className="text-gray-300 font-medium mb-2">Comentários</h3>
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-gray-300 font-medium">Comentários</h3>
+        <button 
+          onClick={onToggleMindMap}
+          className={`p-1.5 rounded transition-colors ${isMindMapExpanded ? 'bg-purple-600/30 text-purple-400' : 'hover:bg-slate-800 text-gray-400 hover:text-purple-400'}`}
+          title="Expandir Mapa Mental"
+        >
+          <Network size={18} />
+        </button>
+      </div>
+      
       {comments.map(comment => (
         <div 
           key={comment.id}
@@ -32,14 +60,13 @@ export const CommentSidebar: React.FC<CommentSidebarProps> = ({ onHoverComment, 
           <div className="text-xs text-gray-500 mb-2 italic border-l-2 border-gray-600 pl-2 line-clamp-2">
             "{comment.selected_text}"
           </div>
-          <textarea
-            className="w-full bg-transparent text-sm text-gray-300 resize-none outline-none"
-            defaultValue={comment.content}
-            onBlur={(e) => {
-              if (e.target.value !== comment.content) {
-                updateComment(comment.id, e.target.value);
+          <CommentBox 
+            initialContent={comment.content} 
+            onBlur={(newContent) => {
+              if (newContent !== comment.content) {
+                updateComment(comment.id, newContent);
               }
-            }}
+            }} 
           />
           <button 
             onClick={() => deleteComment(comment.id)}
@@ -56,3 +83,4 @@ export const CommentSidebar: React.FC<CommentSidebarProps> = ({ onHoverComment, 
     </div>
   );
 };
+

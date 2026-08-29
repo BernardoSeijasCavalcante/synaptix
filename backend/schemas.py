@@ -48,17 +48,40 @@ class CommentBase(BaseModel):
     note_id: int
     content: str
     selected_text: str
+    x_position: Optional[int] = None
+    y_position: Optional[int] = None
 
 class CommentCreate(CommentBase):
     pass
 
 class CommentUpdate(BaseModel):
     content: Optional[str] = None
+    x_position: Optional[int] = None
+    y_position: Optional[int] = None
 
 class CommentResponse(CommentBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Comment Connection Schemas
+class CommentConnectionBase(BaseModel):
+    source_comment_id: int
+    target_comment_id: int
+    observation: Optional[str] = None
+
+class CommentConnectionCreate(CommentConnectionBase):
+    pass
+
+class CommentConnectionUpdate(BaseModel):
+    observation: Optional[str] = None
+
+class CommentConnectionResponse(CommentConnectionBase):
+    id: int
+    created_at: datetime
     
     class Config:
         from_attributes = True

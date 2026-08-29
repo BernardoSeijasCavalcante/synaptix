@@ -20,6 +20,9 @@ import { Save, Trash, Bold, Italic, Strikethrough, Code, Table as TableIcon, Plu
 import { InputRule, Extension } from '@tiptap/core';
 import { CommentMark } from './extensions/CommentMark';
 import { CommentSidebar } from './CommentSidebar';
+import Mention from '@tiptap/extension-mention';
+import suggestion from './extensions/suggestion';
+import { CommentMindMap } from './CommentMindMap';
 
 const lowlight = createLowlight(all);
 
@@ -44,6 +47,8 @@ export const NoteEditor = () => {
   const [title, setTitle] = useState('');
   
   const [hoveredCommentId, setHoveredCommentId] = useState<number | null>(null);
+  const [isMindMapExpanded, setIsMindMapExpanded] = useState(false);
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const [connections, setConnections] = useState<{ id: number; path: string }[]>([]);
@@ -63,6 +68,12 @@ export const NoteEditor = () => {
       TableShortcut,
       TextAlign.configure({ types: ['tableCell', 'tableHeader'] }),
       CommentMark,
+      Mention.configure({
+        HTMLAttributes: {
+          class: 'mention bg-yellow-500/20 text-yellow-500 rounded px-1 font-medium cursor-pointer hover:bg-yellow-500/30 transition-colors',
+        },
+        suggestion,
+      }),
     ],
     content: '',
     editorProps: {
@@ -73,10 +84,10 @@ export const NoteEditor = () => {
   });
 
   useEffect(() => {
-    if (activeNoteId) {
+    if (activeNoteId && !isMindMapExpanded) {
       fetchComments(activeNoteId);
     }
-  }, [activeNoteId]);
+  }, [activeNoteId, isMindMapExpanded]);
 
   useEffect(() => {
     if (activeNote && editor) {
@@ -89,7 +100,7 @@ export const NoteEditor = () => {
   }, [activeNoteId, editor]);
 
   const updateConnections = () => {
-    if (!containerRef.current || !editorRef.current) return;
+    if (!containerRef.current || !editorRef.current || isMindMapExpanded) return;
     const containerRect = containerRef.current.getBoundingClientRect();
     const newConnections: { id: number; path: string }[] = [];
 
@@ -128,7 +139,7 @@ export const NoteEditor = () => {
       window.removeEventListener('resize', updateConnections);
       clearInterval(interval);
     };
-  }, [comments, editor?.state.doc]);
+  }, [comments, editor?.state.doc, isMindMapExpanded]);
 
   const handleSave = () => {
     if (!activeNote || !editor) return;
@@ -179,138 +190,155 @@ export const NoteEditor = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#0a1128] text-gray-100 overflow-hidden">
-      <div className="flex flex-col p-6 border-b border-slate-800 gap-4 shrink-0">
-        <div className="flex justify-between items-center">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={handleSave}
-            className="text-3xl font-bold bg-transparent border-none focus:ring-0 outline-none w-full text-white placeholder-gray-600"
-            placeholder="Título da Nota"
-          />
-          <div className="flex gap-2 shrink-0">
+      {!isMindMapExpanded && (
+        <div className="flex flex-col p-6 border-b border-slate-800 gap-4 shrink-0">
+          <div className="flex justify-between items-center">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={handleSave}
+              className="text-3xl font-bold bg-transparent border-none focus:ring-0 outline-none w-full text-white placeholder-gray-600"
+              placeholder="Título da Nota"
+            />
+            <div className="flex gap-2 shrink-0">
+              <button 
+                onClick={handleSave}
+                className="flex items-center gap-2 bg-yellow-600/20 text-yellow-500 hover:bg-yellow-600/30 px-4 py-2 rounded transition-colors"
+              >
+                <Save size={18} />
+                <span>Salvar</span>
+              </button>
+              <button 
+                onClick={handleDelete}
+                className="flex items-center gap-2 text-red-400 hover:bg-red-900/30 px-4 py-2 rounded transition-colors"
+              >
+                <Trash size={18} />
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-2 text-gray-400">
             <button 
-              onClick={handleSave}
-              className="flex items-center gap-2 bg-yellow-600/20 text-yellow-500 hover:bg-yellow-600/30 px-4 py-2 rounded transition-colors"
+              onClick={insertTable}
+              className="flex items-center gap-1 hover:text-yellow-400 text-sm bg-slate-900 px-2 py-1 rounded border border-slate-700 transition"
+              title="Inserir Tabela"
             >
-              <Save size={18} />
-              <span>Salvar</span>
-            </button>
-            <button 
-              onClick={handleDelete}
-              className="flex items-center gap-2 text-red-400 hover:bg-red-900/30 px-4 py-2 rounded transition-colors"
-            >
-              <Trash size={18} />
+              <TableIcon size={14} /> Tabela
             </button>
           </div>
         </div>
-        <div className="flex gap-2 text-gray-400">
-          <button 
-            onClick={insertTable}
-            className="flex items-center gap-1 hover:text-yellow-400 text-sm bg-slate-900 px-2 py-1 rounded border border-slate-700 transition"
-            title="Inserir Tabela"
-          >
-            <TableIcon size={14} /> Tabela
-          </button>
-        </div>
-      </div>
+      )}
       
       <div className="flex-1 flex overflow-hidden relative" ref={containerRef}>
-        <svg className="absolute inset-0 pointer-events-none z-10" style={{ width: '100%', height: '100%' }}>
-          {connections.map(conn => (
-            <path 
-              key={conn.id} 
-              d={conn.path} 
-              fill="none" 
-              stroke={hoveredCommentId === conn.id ? "#eab308" : "#334155"} 
-              strokeWidth="2"
-              className="transition-colors duration-200"
-            />
-          ))}
-        </svg>
+        {!isMindMapExpanded && (
+          <svg className="absolute inset-0 pointer-events-none z-10" style={{ width: '100%', height: '100%' }}>
+            {connections.map(conn => (
+              <path 
+                key={conn.id} 
+                d={conn.path} 
+                fill="none" 
+                stroke={hoveredCommentId === conn.id ? "#eab308" : "#334155"} 
+                strokeWidth="2"
+                className="transition-colors duration-200"
+              />
+            ))}
+          </svg>
+        )}
 
-        <div className="flex-1 overflow-y-auto p-8 relative" ref={editorRef} onScroll={updateConnections}>
-          <div className="max-w-4xl mx-auto">
-            {editor && (
-              <>
-                <FloatingMenu editor={editor} className="bg-slate-900 shadow-xl border border-slate-700 rounded-lg flex overflow-hidden -ml-12">
-                  <button
-                    onClick={insertTable}
-                    className="flex items-center gap-2 p-2 hover:bg-slate-800 transition text-gray-300 hover:text-yellow-500 text-sm"
-                    title="Inserir Tabela (/tabela)"
-                  >
-                    <Plus size={16} /> <TableIcon size={16} />
-                  </button>
-                </FloatingMenu>
+        {isMindMapExpanded ? (
+          <CommentMindMap onNavigateToNote={(noteId) => {
+            setActiveNote(noteId);
+            setIsMindMapExpanded(false);
+          }} />
+        ) : (
+          <div className="flex-1 overflow-y-auto p-8 relative" ref={editorRef} onScroll={updateConnections}>
+            <div className="max-w-4xl mx-auto">
+              {editor && (
+                <>
+                  <FloatingMenu editor={editor} className="bg-slate-900 shadow-xl border border-slate-700 rounded-lg flex overflow-hidden -ml-12">
+                    <button
+                      onClick={insertTable}
+                      className="flex items-center gap-2 p-2 hover:bg-slate-800 transition text-gray-300 hover:text-yellow-500 text-sm"
+                      title="Inserir Tabela (/tabela)"
+                    >
+                      <Plus size={16} /> <TableIcon size={16} />
+                    </button>
+                  </FloatingMenu>
 
-                <BubbleMenu editor={editor} shouldShow={(props: any) => {
-                  return !props.editor.isActive('table') && props.from !== props.to;
-                }} className="bg-slate-900 shadow-xl border border-slate-700 rounded-lg flex overflow-hidden z-50">
-                  <button
-                    onClick={handleAddComment}
-                    className="p-2 hover:bg-slate-800 transition text-gray-300 hover:text-yellow-500"
-                    title="Comentar"
-                  >
-                    <MessageSquarePlus size={16} />
-                  </button>
-                  <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
-                  <button
-                    onClick={() => editor.chain().focus().toggleBold().run()}
-                    className={`p-2 hover:bg-slate-800 transition ${editor.isActive('bold') ? 'text-yellow-500' : 'text-gray-300'}`}
-                    title="Negrito (Ctrl+B)"
-                  >
-                    <Bold size={16} />
-                  </button>
-                  <button
-                    onClick={() => editor.chain().focus().toggleItalic().run()}
-                    className={`p-2 hover:bg-slate-800 transition ${editor.isActive('italic') ? 'text-yellow-500' : 'text-gray-300'}`}
-                    title="Itálico (Ctrl+I)"
-                  >
-                    <Italic size={16} />
-                  </button>
-                  <button
-                    onClick={() => editor.chain().focus().toggleStrike().run()}
-                    className={`p-2 hover:bg-slate-800 transition ${editor.isActive('strike') ? 'text-yellow-500' : 'text-gray-300'}`}
-                    title="Tachado (Ctrl+Shift+X)"
-                  >
-                    <Strikethrough size={16} />
-                  </button>
-                  <button
-                    onClick={() => editor.chain().focus().toggleCode().run()}
-                    className={`p-2 hover:bg-slate-800 transition ${editor.isActive('code') ? 'text-yellow-500' : 'text-gray-300'}`}
-                    title="Código (Ctrl+E)"
-                  >
-                    <Code size={16} />
-                  </button>
-                </BubbleMenu>
+                  <BubbleMenu editor={editor} shouldShow={(props: any) => {
+                    return !props.editor.isActive('table') && props.from !== props.to;
+                  }} className="bg-slate-900 shadow-xl border border-slate-700 rounded-lg flex overflow-hidden z-50">
+                    <button
+                      onClick={handleAddComment}
+                      className="p-2 hover:bg-slate-800 transition text-gray-300 hover:text-yellow-500"
+                      title="Comentar"
+                    >
+                      <MessageSquarePlus size={16} />
+                    </button>
+                    <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
+                    <button
+                      onClick={() => editor.chain().focus().toggleBold().run()}
+                      className={`p-2 hover:bg-slate-800 transition ${editor.isActive('bold') ? 'text-yellow-500' : 'text-gray-300'}`}
+                      title="Negrito (Ctrl+B)"
+                    >
+                      <Bold size={16} />
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().toggleItalic().run()}
+                      className={`p-2 hover:bg-slate-800 transition ${editor.isActive('italic') ? 'text-yellow-500' : 'text-gray-300'}`}
+                      title="Itálico (Ctrl+I)"
+                    >
+                      <Italic size={16} />
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().toggleStrike().run()}
+                      className={`p-2 hover:bg-slate-800 transition ${editor.isActive('strike') ? 'text-yellow-500' : 'text-gray-300'}`}
+                      title="Tachado (Ctrl+Shift+X)"
+                    >
+                      <Strikethrough size={16} />
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().toggleCode().run()}
+                      className={`p-2 hover:bg-slate-800 transition ${editor.isActive('code') ? 'text-yellow-500' : 'text-gray-300'}`}
+                      title="Código (Ctrl+E)"
+                    >
+                      <Code size={16} />
+                    </button>
+                  </BubbleMenu>
 
-                <BubbleMenu editor={editor} shouldShow={(props: any) => props.editor.isActive('table')} className="bg-slate-900 shadow-xl border border-slate-700 rounded-lg flex flex-wrap max-w-xs overflow-hidden z-50 p-1 gap-1">
-                  <button onClick={() => editor.chain().focus().addRowBefore().run()} className="p-1 hover:bg-slate-800 text-gray-300 rounded" title="Adicionar linha acima"><ArrowUp size={16}/></button>
-                  <button onClick={() => editor.chain().focus().addRowAfter().run()} className="p-1 hover:bg-slate-800 text-gray-300 rounded" title="Adicionar linha abaixo"><ArrowDown size={16}/></button>
-                  <button onClick={() => editor.chain().focus().deleteRow().run()} className="p-1 hover:bg-slate-800 text-red-400 rounded" title="Deletar linha"><Trash2 size={16}/></button>
-                  <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
-                  <button onClick={() => editor.chain().focus().addColumnBefore().run()} className="p-1 hover:bg-slate-800 text-gray-300 rounded" title="Adicionar coluna à esquerda"><ArrowLeft size={16}/></button>
-                  <button onClick={() => editor.chain().focus().addColumnAfter().run()} className="p-1 hover:bg-slate-800 text-gray-300 rounded" title="Adicionar coluna à direita"><ArrowRight size={16}/></button>
-                  <button onClick={() => editor.chain().focus().deleteColumn().run()} className="p-1 hover:bg-slate-800 text-red-400 rounded" title="Deletar coluna"><Trash2 size={16}/></button>
-                  <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
-                  <button onClick={() => editor.chain().focus().setTextAlign('left').run()} className={`p-1 hover:bg-slate-800 rounded ${editor.isActive({ textAlign: 'left' }) ? 'text-yellow-500' : 'text-gray-300'}`} title="Alinhar à Esquerda"><AlignLeft size={16}/></button>
-                  <button onClick={() => editor.chain().focus().setTextAlign('center').run()} className={`p-1 hover:bg-slate-800 rounded ${editor.isActive({ textAlign: 'center' }) ? 'text-yellow-500' : 'text-gray-300'}`} title="Centralizar"><AlignCenter size={16}/></button>
-                  <button onClick={() => editor.chain().focus().setTextAlign('right').run()} className={`p-1 hover:bg-slate-800 rounded ${editor.isActive({ textAlign: 'right' }) ? 'text-yellow-500' : 'text-gray-300'}`} title="Alinhar à Direita"><AlignRight size={16}/></button>
-                  <button onClick={() => editor.chain().focus().setTextAlign('justify').run()} className={`p-1 hover:bg-slate-800 rounded ${editor.isActive({ textAlign: 'justify' }) ? 'text-yellow-500' : 'text-gray-300'}`} title="Justificar"><AlignJustify size={16}/></button>
-                  <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
-                  <button onClick={() => editor.chain().focus().deleteTable().run()} className="p-1 flex items-center gap-1 hover:bg-red-900/30 text-red-500 rounded px-2" title="Deletar Tabela"><Trash size={14}/> Tabela</button>
-                </BubbleMenu>
-              </>
-            )}
-            <EditorContent editor={editor} />
+                  <BubbleMenu editor={editor} shouldShow={(props: any) => props.editor.isActive('table')} className="bg-slate-900 shadow-xl border border-slate-700 rounded-lg flex flex-wrap max-w-xs overflow-hidden z-50 p-1 gap-1">
+                    <button onClick={() => editor.chain().focus().addRowBefore().run()} className="p-1 hover:bg-slate-800 text-gray-300 rounded" title="Adicionar linha acima"><ArrowUp size={16}/></button>
+                    <button onClick={() => editor.chain().focus().addRowAfter().run()} className="p-1 hover:bg-slate-800 text-gray-300 rounded" title="Adicionar linha abaixo"><ArrowDown size={16}/></button>
+                    <button onClick={() => editor.chain().focus().deleteRow().run()} className="p-1 hover:bg-slate-800 text-red-400 rounded" title="Deletar linha"><Trash2 size={16}/></button>
+                    <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
+                    <button onClick={() => editor.chain().focus().addColumnBefore().run()} className="p-1 hover:bg-slate-800 text-gray-300 rounded" title="Adicionar coluna à esquerda"><ArrowLeft size={16}/></button>
+                    <button onClick={() => editor.chain().focus().addColumnAfter().run()} className="p-1 hover:bg-slate-800 text-gray-300 rounded" title="Adicionar coluna à direita"><ArrowRight size={16}/></button>
+                    <button onClick={() => editor.chain().focus().deleteColumn().run()} className="p-1 hover:bg-slate-800 text-red-400 rounded" title="Deletar coluna"><Trash2 size={16}/></button>
+                    <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
+                    <button onClick={() => editor.chain().focus().setTextAlign('left').run()} className={`p-1 hover:bg-slate-800 rounded ${editor.isActive({ textAlign: 'left' }) ? 'text-yellow-500' : 'text-gray-300'}`} title="Alinhar à Esquerda"><AlignLeft size={16}/></button>
+                    <button onClick={() => editor.chain().focus().setTextAlign('center').run()} className={`p-1 hover:bg-slate-800 rounded ${editor.isActive({ textAlign: 'center' }) ? 'text-yellow-500' : 'text-gray-300'}`} title="Centralizar"><AlignCenter size={16}/></button>
+                    <button onClick={() => editor.chain().focus().setTextAlign('right').run()} className={`p-1 hover:bg-slate-800 rounded ${editor.isActive({ textAlign: 'right' }) ? 'text-yellow-500' : 'text-gray-300'}`} title="Alinhar à Direita"><AlignRight size={16}/></button>
+                    <button onClick={() => editor.chain().focus().setTextAlign('justify').run()} className={`p-1 hover:bg-slate-800 rounded ${editor.isActive({ textAlign: 'justify' }) ? 'text-yellow-500' : 'text-gray-300'}`} title="Justificar"><AlignJustify size={16}/></button>
+                    <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
+                    <button onClick={() => editor.chain().focus().deleteTable().run()} className="p-1 flex items-center gap-1 hover:bg-red-900/30 text-red-500 rounded px-2" title="Deletar Tabela"><Trash size={14}/> Tabela</button>
+                  </BubbleMenu>
+                </>
+              )}
+              <EditorContent editor={editor} />
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="shrink-0 z-20 h-full flex flex-col" onScroll={updateConnections}>
-          <CommentSidebar onHoverComment={setHoveredCommentId} hoveredCommentId={hoveredCommentId} />
+          <CommentSidebar 
+            onHoverComment={setHoveredCommentId} 
+            hoveredCommentId={hoveredCommentId} 
+            isMindMapExpanded={isMindMapExpanded}
+            onToggleMindMap={() => setIsMindMapExpanded(!isMindMapExpanded)}
+          />
         </div>
       </div>
     </div>
   );
 };
+
