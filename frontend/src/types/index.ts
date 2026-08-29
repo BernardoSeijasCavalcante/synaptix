@@ -14,3 +14,12 @@ export interface Note {
   created_at: string;
   updated_at: string;
 }
+
+export interface Comment {
+  id: number;
+  note_id: number;
+  content: string;
+  selected_text: string;
+  created_at: string;
+  updated_at: string;
+}

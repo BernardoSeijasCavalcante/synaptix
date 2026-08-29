@@ -91,6 +91,44 @@ def delete_note(note_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Note deleted"}
 
+# Comment Endpoints
+@app.post("/notes/{note_id}/comments", response_model=schemas.CommentResponse)
+def create_comment(note_id: int, comment: schemas.CommentCreate, db: Session = Depends(get_db)):
+    if note_id != comment.note_id:
+        raise HTTPException(status_code=400, detail="Path note_id does not match payload note_id")
+    db_comment = models.Comment(**comment.model_dump())
+    db.add(db_comment)
+    db.commit()
+    db.refresh(db_comment)
+    return db_comment
+
+@app.get("/notes/{note_id}/comments", response_model=List[schemas.CommentResponse])
+def get_comments(note_id: int, db: Session = Depends(get_db)):
+    return db.query(models.Comment).filter(models.Comment.note_id == note_id).all()
+
+@app.put("/comments/{comment_id}", response_model=schemas.CommentResponse)
+def update_comment(comment_id: int, comment: schemas.CommentUpdate, db: Session = Depends(get_db)):
+    db_comment = db.query(models.Comment).filter(models.Comment.id == comment_id).first()
+    if not db_comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    
+    update_data = comment.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_comment, key, value)
+        
+    db.commit()
+    db.refresh(db_comment)
+    return db_comment
+
+@app.delete("/comments/{comment_id}")
+def delete_comment(comment_id: int, db: Session = Depends(get_db)):
+    db_comment = db.query(models.Comment).filter(models.Comment.id == comment_id).first()
+    if not db_comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    db.delete(db_comment)
+    db.commit()
+    return {"message": "Comment deleted"}
+
 
 @app.post("/analyze")
 def analyze_content(payload: dict):

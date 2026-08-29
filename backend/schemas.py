@@ -42,3 +42,23 @@ class NoteResponse(NoteBase):
     
     class Config:
         from_attributes = True
+
+# Comment Schemas
+class CommentBase(BaseModel):
+    note_id: int
+    content: str
+    selected_text: str
+
+class CommentCreate(CommentBase):
+    pass
+
+class CommentUpdate(BaseModel):
+    content: Optional[str] = None
+
+class CommentResponse(CommentBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
