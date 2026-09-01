@@ -57,9 +57,15 @@ export const CommentSidebar: React.FC<CommentSidebarProps> = ({
           onMouseEnter={() => onHoverComment(comment.id)}
           onMouseLeave={() => onHoverComment(null)}
         >
-          <div className="text-xs text-gray-500 mb-2 italic border-l-2 border-gray-600 pl-2 line-clamp-2">
-            "{comment.selected_text}"
-          </div>
+          {comment.selected_text ? (
+            <div className="text-xs text-gray-500 mb-2 italic border-l-2 border-gray-600 pl-2 line-clamp-2">
+              "{comment.selected_text}"
+            </div>
+          ) : comment.page_number ? (
+            <div className="text-xs text-gray-500 mb-2 font-medium bg-slate-800 px-2 py-1 rounded inline-block">
+              Página {comment.page_number}
+            </div>
+          ) : null}
           <CommentBox 
             initialContent={comment.content} 
             onBlur={(newContent) => {

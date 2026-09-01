@@ -79,6 +79,7 @@ export const CommentMindMap: React.FC<CommentMindMapProps> = ({ onNavigateToNote
             note_title: note?.title || 'Nota Desconhecida',
             content: comment.content,
             selected_text: comment.selected_text,
+            page_number: comment.page_number,
             onTitleClick: onNavigateToNote,
           },
         };

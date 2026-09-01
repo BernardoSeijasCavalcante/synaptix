@@ -23,6 +23,7 @@ import { CommentSidebar } from './CommentSidebar';
 import Mention from '@tiptap/extension-mention';
 import suggestion from './extensions/suggestion';
 import { CommentMindMap } from './CommentMindMap';
+import { DocumentViewer } from './DocumentViewer';
 
 const lowlight = createLowlight(all);
 
@@ -324,7 +325,12 @@ export const NoteEditor = () => {
                   </BubbleMenu>
                 </>
               )}
-              <EditorContent editor={editor} />
+              
+              {activeNote.note_type === 'pdf' || activeNote.note_type === 'slide' ? (
+                <DocumentViewer noteId={activeNote.id} fileUrl={activeNote.file_url || ''} />
+              ) : (
+                <EditorContent editor={editor} />
+              )}
             </div>
           </div>
         )}

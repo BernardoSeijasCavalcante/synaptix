@@ -20,6 +20,7 @@ interface NotesState {
 
   fetchNotes: (notebookId?: number) => Promise<void>;
   createNote: (title: string, content: string, notebookId?: number | null) => Promise<void>;
+  uploadNote: (file: File, notebookId?: number | null) => Promise<void>;
   updateNote: (id: number, updates: Partial<Note>) => Promise<void>;
   deleteNote: (id: number) => Promise<void>;
 }
@@ -98,12 +99,35 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       const res = await fetch(`${API_URL}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, notebook_id: notebookId })
+        body: JSON.stringify({ title, content, note_type: 'markdown', notebook_id: notebookId })
       });
       const newNote = await res.json();
       set((state) => ({ notes: [...state.notes, newNote] }));
     } catch (error) {
       console.error('Error creating note', error);
+    }
+  },
+
+  uploadNote: async (file, notebookId = null) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const uploadRes = await fetch(`${API_URL}/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      const { file_url, filename } = await uploadRes.json();
+      
+      const res = await fetch(`${API_URL}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: filename, note_type: 'pdf', file_url, notebook_id: notebookId })
+      });
+      const newNote = await res.json();
+      set((state) => ({ notes: [...state.notes, newNote] }));
+    } catch (error) {
+      console.error('Error uploading note', error);
     }
   },
 

@@ -15,9 +15,15 @@ export function CommentNode({ data }: { data: any }) {
       </div>
 
       <div className="p-4 flex flex-col gap-3">
-        <div className="text-xs text-gray-500 italic border-l-2 border-gray-600 pl-2">
-          "{data.selected_text}"
-        </div>
+        {data.selected_text ? (
+          <div className="text-xs text-gray-500 italic border-l-2 border-gray-600 pl-2">
+            "{data.selected_text}"
+          </div>
+        ) : data.page_number ? (
+          <div className="text-xs text-gray-500 font-medium bg-slate-800 px-2 py-1 rounded inline-block w-fit">
+            Página {data.page_number}
+          </div>
+        ) : null}
         
         {/* Usando dangerouslySetInnerHTML pois o conteúdo vem do Tiptap e contém as menções formatadas em HTML */}
         <div 

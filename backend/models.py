@@ -21,7 +21,9 @@ class Note(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True)
-    content = Column(Text)
+    content = Column(Text, nullable=True) # Text content, now optional for PDFs
+    note_type = Column(String, default="markdown") # "markdown", "pdf", "slide"
+    file_url = Column(String, nullable=True)
     notebook_id = Column(Integer, ForeignKey("notebooks.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -35,9 +37,12 @@ class Comment(Base):
     id = Column(Integer, primary_key=True, index=True)
     note_id = Column(Integer, ForeignKey("notes.id"))
     content = Column(Text)
-    selected_text = Column(Text)
+    selected_text = Column(Text, nullable=True)
     x_position = Column(Integer, nullable=True)
     y_position = Column(Integer, nullable=True)
+    width = Column(Integer, nullable=True)
+    height = Column(Integer, nullable=True)
+    page_number = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

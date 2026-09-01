@@ -1,7 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import List
+import os
+import shutil
+import uuid
 
 import models
 import schemas
@@ -11,6 +15,10 @@ from database import engine, get_db
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Synaptix API")
+
+# Ensure uploads directory exists
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Allow CORS for local Vite dev server
 app.add_middleware(
@@ -24,6 +32,18 @@ app.add_middleware(
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Synaptix API"}
+
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    # Generate unique filename to avoid conflicts
+    file_ext = file.filename.split(".")[-1] if "." in file.filename else "pdf"
+    unique_filename = f"{uuid.uuid4()}.{file_ext}"
+    file_path = os.path.join("uploads", unique_filename)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    return {"file_url": f"http://localhost:8000/uploads/{unique_filename}", "filename": file.filename}
 
 # Notebook Endpoints
 @app.post("/notebooks", response_model=schemas.NotebookResponse)

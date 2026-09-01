@@ -24,15 +24,19 @@ class NotebookResponse(NotebookBase):
 # Note Schemas
 class NoteBase(BaseModel):
     title: str
-    content: str
+    content: Optional[str] = None
+    note_type: str = "markdown"
+    file_url: Optional[str] = None
     notebook_id: Optional[int] = None
 
 class NoteCreate(NoteBase):
     pass
 
-class NoteUpdate(NoteBase):
+class NoteUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
+    note_type: Optional[str] = None
+    file_url: Optional[str] = None
     notebook_id: Optional[int] = None
 
 class NoteResponse(NoteBase):
@@ -47,17 +51,24 @@ class NoteResponse(NoteBase):
 class CommentBase(BaseModel):
     note_id: int
     content: str
-    selected_text: str
+    selected_text: Optional[str] = None
     x_position: Optional[int] = None
     y_position: Optional[int] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    page_number: Optional[int] = None
 
 class CommentCreate(CommentBase):
     pass
 
 class CommentUpdate(BaseModel):
     content: Optional[str] = None
+    selected_text: Optional[str] = None
     x_position: Optional[int] = None
     y_position: Optional[int] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    page_number: Optional[int] = None
 
 class CommentResponse(CommentBase):
     id: int

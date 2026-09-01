@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNotesStore } from '../store/useNotesStore';
-import { Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2, Upload } from 'lucide-react';
 import type { Notebook } from '../types';
 
 const NotebookItem = ({ notebook, depth = 0 }: { notebook: Notebook; depth?: number }) => {
@@ -17,6 +17,16 @@ const NotebookItem = ({ notebook, depth = 0 }: { notebook: Notebook; depth?: num
     e.stopPropagation();
     setIsOpen(!isOpen);
     setActiveNotebook(notebook.id);
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      useNotesStore.getState().uploadNote(file, notebook.id);
+      setIsOpen(true);
+    }
   };
 
   const handleAddSubNotebook = (e: React.MouseEvent) => {
@@ -46,6 +56,13 @@ const NotebookItem = ({ notebook, depth = 0 }: { notebook: Notebook; depth?: num
 
   return (
     <div>
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        style={{ display: 'none' }} 
+        accept="application/pdf"
+        onChange={handleUploadFile} 
+      />
       <div
         className={`flex items-center justify-between py-1.5 px-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-blue-900/50 text-yellow-500' : 'text-gray-300 hover:bg-blue-900/30 hover:text-white'}`}
         style={{ paddingLeft: `${depth * 1 + 0.5}rem` }}
@@ -63,6 +80,9 @@ const NotebookItem = ({ notebook, depth = 0 }: { notebook: Notebook; depth?: num
         
         {isHovered && (
           <div className="flex items-center gap-1">
+            <button onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }} className="p-1 hover:text-yellow-400" title="Upload PDF">
+              <Upload size={14} />
+            </button>
             <button onClick={handleAddSubNotebook} className="p-1 hover:text-yellow-400" title="Novo Sub-caderno">
               <Folder size={14} />
             </button>
