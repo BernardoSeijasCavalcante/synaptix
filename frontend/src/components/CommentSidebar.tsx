@@ -8,13 +8,15 @@ interface CommentSidebarProps {
   hoveredCommentId: number | null;
   onToggleMindMap: () => void;
   isMindMapExpanded: boolean;
+  onClickComment?: (page: number | null | undefined) => void;
 }
 
 export const CommentSidebar: React.FC<CommentSidebarProps> = ({ 
   onHoverComment, 
   hoveredCommentId,
   onToggleMindMap,
-  isMindMapExpanded
+  isMindMapExpanded,
+  onClickComment
 }) => {
   const { comments, deleteComment, updateComment } = useCommentsStore();
 
@@ -53,9 +55,10 @@ export const CommentSidebar: React.FC<CommentSidebarProps> = ({
         <div 
           key={comment.id}
           id={`sidebar-comment-${comment.id}`}
-          className={`bg-slate-900 border rounded-lg p-3 relative transition-colors ${hoveredCommentId === comment.id ? 'border-yellow-500' : 'border-slate-700'}`}
+          className={`bg-slate-900 border rounded-lg p-3 relative transition-colors ${hoveredCommentId === comment.id ? 'border-yellow-500' : 'border-slate-700'} ${onClickComment ? 'cursor-pointer' : ''}`}
           onMouseEnter={() => onHoverComment(comment.id)}
           onMouseLeave={() => onHoverComment(null)}
+          onClick={() => onClickComment?.(comment.page_number)}
         >
           {comment.rect_x1 != null ? (
             <div className="text-xs text-gray-400 mb-2 bg-slate-800/50 p-2 rounded border border-slate-700 flex items-center gap-2">

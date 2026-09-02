@@ -2,20 +2,31 @@ import { useState, useRef, MouseEvent } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { useNotesStore } from '../store/useNotesStore';
 import { useCommentsStore } from '../store/useCommentsStore';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, PanelRight } from 'lucide-react';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
 // Set up the worker for react-pdf
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-export const DocumentViewer = ({ hoveredCommentId }: { hoveredCommentId: number | null }) => {
+export const DocumentViewer = ({ 
+  hoveredCommentId, 
+  pageNumber, 
+  setPageNumber,
+  isSidebarOpen,
+  onToggleSidebar
+}: { 
+  hoveredCommentId: number | null, 
+  pageNumber: number, 
+  setPageNumber: (page: number | ((p: number) => number)) => void,
+  isSidebarOpen?: boolean,
+  onToggleSidebar?: () => void
+}) => {
   const { notes, activeNoteId } = useNotesStore();
   const { comments, createComment } = useCommentsStore();
   const activeNote = notes.find(n => n.id === activeNoteId);
 
   const [numPages, setNumPages] = useState<number>();
-  const [pageNumber, setPageNumber] = useState<number>(1);
   const [scale, setScale] = useState(1.0);
 
   const [isSelecting, setIsSelecting] = useState(false);
@@ -118,6 +129,19 @@ export const DocumentViewer = ({ hoveredCommentId }: { hoveredCommentId: number 
             <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="p-1 hover:text-yellow-400">
               <ZoomIn size={18} />
             </button>
+            
+            {onToggleSidebar && (
+              <>
+                <div className="w-px h-4 bg-slate-700 mx-2"></div>
+                <button 
+                  onClick={onToggleSidebar} 
+                  className={`p-1 hover:text-yellow-400 transition-colors ${isSidebarOpen ? 'text-yellow-500' : 'text-gray-500'}`}
+                  title="Alternar Sidebar de Comentários"
+                >
+                  <PanelRight size={18} />
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -168,6 +192,7 @@ export const DocumentViewer = ({ hoveredCommentId }: { hoveredCommentId: number 
               return (
                 <div 
                   key={comment.id}
+                  data-pdf-comment-id={comment.id}
                   className={`absolute border-2 rounded cursor-pointer group hover:bg-yellow-500/40 transition-colors ${hoveredCommentId === comment.id ? 'border-yellow-400 bg-yellow-500/40 z-10' : 'border-yellow-500/80 bg-yellow-500/20'}`}
                   style={{
                     left: `${x1 * 100}%`,

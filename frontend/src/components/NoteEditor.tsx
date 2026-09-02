@@ -16,7 +16,7 @@ import { all, createLowlight } from 'lowlight';
 import 'highlight.js/styles/github-dark.css';
 import { useNotesStore } from '../store/useNotesStore';
 import { useCommentsStore } from '../store/useCommentsStore';
-import { Save, Trash, Bold, Italic, Strikethrough, Code, Table as TableIcon, Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, AlignLeft, AlignCenter, AlignRight, AlignJustify, MessageSquarePlus } from 'lucide-react';
+import { Save, Trash, Bold, Italic, Strikethrough, Code, Table as TableIcon, Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, AlignLeft, AlignCenter, AlignRight, AlignJustify, MessageSquarePlus, PanelRight } from 'lucide-react';
 import { InputRule, Extension } from '@tiptap/core';
 import { CommentMark } from './extensions/CommentMark';
 import { CommentSidebar } from './CommentSidebar';
@@ -49,6 +49,8 @@ export const NoteEditor = () => {
   
   const [hoveredCommentId, setHoveredCommentId] = useState<number | null>(null);
   const [isMindMapExpanded, setIsMindMapExpanded] = useState(false);
+  const [pdfPageNumber, setPdfPageNumber] = useState(1);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -93,6 +95,7 @@ export const NoteEditor = () => {
   useEffect(() => {
     if (activeNote && editor) {
       setTitle(activeNote.title);
+      setPdfPageNumber(1);
       const currentMarkdown = (editor as any).storage.markdown.getMarkdown();
       if (currentMarkdown !== activeNote.content) {
         editor.commands.setContent(activeNote.content);
@@ -106,7 +109,8 @@ export const NoteEditor = () => {
     const newConnections: { id: number; path: string }[] = [];
 
     comments.forEach(comment => {
-      const markElement = document.querySelector(`mark[data-comment-id="${comment.id}"]`);
+      const markElement = document.querySelector(`mark[data-comment-id="${comment.id}"]`) || 
+                          document.querySelector(`div[data-pdf-comment-id="${comment.id}"]`);
       const sidebarElement = document.querySelector(`#sidebar-comment-${comment.id}`);
 
       if (markElement && sidebarElement) {
@@ -140,7 +144,7 @@ export const NoteEditor = () => {
       window.removeEventListener('resize', updateConnections);
       clearInterval(interval);
     };
-  }, [comments, editor?.state.doc, isMindMapExpanded]);
+  }, [comments, editor?.state.doc, isMindMapExpanded, isSidebarOpen]);
 
   const handleSave = () => {
     if (!activeNote || !editor) return;
@@ -189,25 +193,11 @@ export const NoteEditor = () => {
     );
   }
 
-  if (activeNote.type === 'pdf') {
-    return (
-      <div className="flex-1 flex overflow-hidden bg-[#0a1128]">
-        <DocumentViewer hoveredCommentId={hoveredCommentId} />
-        <div className="shrink-0 z-20 h-full flex flex-col border-l border-slate-800">
-          <CommentSidebar 
-            onHoverComment={setHoveredCommentId} 
-            hoveredCommentId={hoveredCommentId} 
-            isMindMapExpanded={isMindMapExpanded}
-            onToggleMindMap={() => setIsMindMapExpanded(!isMindMapExpanded)}
-          />
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#0a1128] text-gray-100 overflow-hidden">
-      {!isMindMapExpanded && (
+      {!isMindMapExpanded && activeNote.type !== 'pdf' && (
         <div className="flex flex-col p-6 border-b border-slate-800 gap-4 shrink-0">
           <div className="flex justify-between items-center">
             <input
@@ -242,6 +232,13 @@ export const NoteEditor = () => {
             >
               <TableIcon size={14} /> Tabela
             </button>
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className={`flex items-center gap-1 text-sm bg-slate-900 px-2 py-1 rounded border border-slate-700 transition ${isSidebarOpen ? 'text-yellow-500 hover:text-yellow-400' : 'hover:text-yellow-400 text-gray-400'}`}
+              title="Alternar Sidebar de Comentários"
+            >
+              <PanelRight size={14} /> Comentários
+            </button>
           </div>
         </div>
       )}
@@ -267,6 +264,14 @@ export const NoteEditor = () => {
             setActiveNote(noteId);
             setIsMindMapExpanded(false);
           }} />
+        ) : activeNote.type === 'pdf' ? (
+          <DocumentViewer 
+            hoveredCommentId={hoveredCommentId} 
+            pageNumber={pdfPageNumber} 
+            setPageNumber={setPdfPageNumber} 
+            isSidebarOpen={isSidebarOpen}
+            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          />
         ) : (
           <div className="flex-1 overflow-y-auto p-8 relative" ref={editorRef} onScroll={updateConnections}>
             <div className="max-w-4xl mx-auto">
@@ -346,14 +351,16 @@ export const NoteEditor = () => {
           </div>
         )}
 
-        <div className="shrink-0 z-20 h-full flex flex-col" onScroll={updateConnections}>
-          <CommentSidebar 
-            onHoverComment={setHoveredCommentId} 
-            hoveredCommentId={hoveredCommentId} 
-            isMindMapExpanded={isMindMapExpanded}
-            onToggleMindMap={() => setIsMindMapExpanded(!isMindMapExpanded)}
-          />
-        </div>
+        {isSidebarOpen && (
+          <div className="shrink-0 z-20 h-full flex flex-col" onScroll={updateConnections}>
+            <CommentSidebar 
+              onHoverComment={setHoveredCommentId} 
+              hoveredCommentId={hoveredCommentId} 
+              isMindMapExpanded={isMindMapExpanded}
+              onToggleMindMap={() => setIsMindMapExpanded(!isMindMapExpanded)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
