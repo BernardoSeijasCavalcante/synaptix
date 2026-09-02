@@ -26,6 +26,8 @@ class NoteBase(BaseModel):
     title: str
     content: str
     notebook_id: Optional[int] = None
+    type: Optional[str] = "markdown"
+    file_url: Optional[str] = None
 
 class NoteCreate(NoteBase):
     pass
@@ -34,6 +36,8 @@ class NoteUpdate(NoteBase):
     title: Optional[str] = None
     content: Optional[str] = None
     notebook_id: Optional[int] = None
+    type: Optional[str] = None
+    file_url: Optional[str] = None
 
 class NoteResponse(NoteBase):
     id: int
@@ -47,17 +51,23 @@ class NoteResponse(NoteBase):
 class CommentBase(BaseModel):
     note_id: int
     content: str
-    selected_text: str
-    x_position: Optional[int] = None
-    y_position: Optional[int] = None
+    selected_text: Optional[str] = None
+    page_number: Optional[int] = None
+    rect_x1: Optional[int] = None
+    rect_y1: Optional[int] = None
+    rect_x2: Optional[int] = None
+    rect_y2: Optional[int] = None
 
 class CommentCreate(CommentBase):
     pass
 
 class CommentUpdate(BaseModel):
     content: Optional[str] = None
-    x_position: Optional[int] = None
-    y_position: Optional[int] = None
+    page_number: Optional[int] = None
+    rect_x1: Optional[int] = None
+    rect_y1: Optional[int] = None
+    rect_x2: Optional[int] = None
+    rect_y2: Optional[int] = None
 
 class CommentResponse(CommentBase):
     id: int

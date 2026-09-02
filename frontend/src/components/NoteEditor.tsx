@@ -23,6 +23,7 @@ import { CommentSidebar } from './CommentSidebar';
 import Mention from '@tiptap/extension-mention';
 import suggestion from './extensions/suggestion';
 import { CommentMindMap } from './CommentMindMap';
+import { DocumentViewer } from './DocumentViewer';
 
 const lowlight = createLowlight(all);
 
@@ -184,6 +185,22 @@ export const NoteEditor = () => {
         <div className="text-6xl mb-4">✍️</div>
         <h2 className="text-xl font-medium text-gray-300">Selecione ou crie uma nota</h2>
         <p className="text-sm mt-2">Escolha um caderno na barra lateral para começar.</p>
+      </div>
+    );
+  }
+
+  if (activeNote.type === 'pdf') {
+    return (
+      <div className="flex-1 flex overflow-hidden bg-[#0a1128]">
+        <DocumentViewer hoveredCommentId={hoveredCommentId} />
+        <div className="shrink-0 z-20 h-full flex flex-col border-l border-slate-800">
+          <CommentSidebar 
+            onHoverComment={setHoveredCommentId} 
+            hoveredCommentId={hoveredCommentId} 
+            isMindMapExpanded={isMindMapExpanded}
+            onToggleMindMap={() => setIsMindMapExpanded(!isMindMapExpanded)}
+          />
+        </div>
       </div>
     );
   }

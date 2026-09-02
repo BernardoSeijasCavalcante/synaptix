@@ -9,7 +9,7 @@ interface CommentsState {
   
   fetchComments: (noteId: number) => Promise<void>;
   fetchNotebookComments: (notebookId: number) => Promise<void>;
-  createComment: (noteId: number, content: string, selectedText: string) => Promise<Comment | null>;
+  createComment: (noteId: number, content: string, selectedText?: string, page_number?: number | null, rect_x1?: number | null, rect_y1?: number | null, rect_x2?: number | null, rect_y2?: number | null) => Promise<Comment | null>;
   updateComment: (id: number, content: string) => Promise<void>;
   updateCommentPosition: (id: number, x: number, y: number) => Promise<void>;
   deleteComment: (id: number) => Promise<void>;
@@ -45,12 +45,12 @@ export const useCommentsStore = create<CommentsState>((set) => ({
     }
   },
 
-  createComment: async (noteId, content, selectedText) => {
+  createComment: async (noteId, content, selectedText, page_number, rect_x1, rect_y1, rect_x2, rect_y2) => {
     try {
       const res = await fetch(`${API_URL}/notes/${noteId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note_id: noteId, content, selected_text: selectedText })
+        body: JSON.stringify({ note_id: noteId, content, selected_text: selectedText, page_number, rect_x1, rect_y1, rect_x2, rect_y2 })
       });
       const newComment = await res.json();
       set((state) => ({ comments: [...state.comments, newComment] }));

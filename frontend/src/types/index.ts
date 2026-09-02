@@ -11,6 +11,8 @@ export interface Note {
   title: string;
   content: string;
   notebook_id: number | null;
+  type?: string;
+  file_url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -19,9 +21,12 @@ export interface Comment {
   id: number;
   note_id: number;
   content: string;
-  selected_text: string;
-  x_position?: number | null;
-  y_position?: number | null;
+  selected_text?: string;
+  page_number?: number | null;
+  rect_x1?: number | null;
+  rect_y1?: number | null;
+  rect_x2?: number | null;
+  rect_y2?: number | null;
   created_at: string;
   updated_at: string;
 }

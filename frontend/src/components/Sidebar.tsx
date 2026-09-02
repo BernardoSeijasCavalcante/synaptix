@@ -66,9 +66,22 @@ const NotebookItem = ({ notebook, depth = 0 }: { notebook: Notebook; depth?: num
             <button onClick={handleAddSubNotebook} className="p-1 hover:text-yellow-400" title="Novo Sub-caderno">
               <Folder size={14} />
             </button>
-            <button onClick={handleAddNote} className="p-1 hover:text-yellow-400" title="Nova Nota">
+            <button onClick={handleAddNote} className="p-1 hover:text-yellow-400" title="Nova Nota Markdown">
               <Plus size={14} />
             </button>
+            <label className="p-1 hover:text-yellow-400 cursor-pointer" title="Upload PDF/Slide">
+              <input type="file" accept="application/pdf" className="hidden" onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const url = await useNotesStore.getState().uploadFile(file);
+                  if (url) {
+                    createNote(file.name, '', notebook.id, 'pdf', url);
+                    setIsOpen(true);
+                  }
+                }
+              }} />
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            </label>
             <button onClick={handleDelete} className="p-1 hover:text-red-400" title="Inativar Caderno">
               <Trash2 size={14} />
             </button>

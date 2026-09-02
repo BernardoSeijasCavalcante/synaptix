@@ -19,9 +19,10 @@ interface NotesState {
   inactivateNotebook: (id: number) => Promise<void>;
 
   fetchNotes: (notebookId?: number) => Promise<void>;
-  createNote: (title: string, content: string, notebookId?: number | null) => Promise<void>;
+  createNote: (title: string, content: string, notebookId?: number | null, type?: string, file_url?: string | null) => Promise<void>;
   updateNote: (id: number, updates: Partial<Note>) => Promise<void>;
   deleteNote: (id: number) => Promise<void>;
+  uploadFile: (file: File) => Promise<string | null>;
 }
 
 export const useNotesStore = create<NotesState>((set, get) => ({
@@ -32,6 +33,22 @@ export const useNotesStore = create<NotesState>((set, get) => ({
 
   setActiveNotebook: (id) => set({ activeNotebookId: id }),
   setActiveNote: (id) => set({ activeNoteId: id }),
+
+  uploadFile: async (file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${API_URL}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      return data.file_url;
+    } catch (error) {
+      console.error('Error uploading file', error);
+      return null;
+    }
+  },
 
   fetchNotebooks: async () => {
     try {
@@ -93,12 +110,12 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     }
   },
 
-  createNote: async (title, content, notebookId = null) => {
+  createNote: async (title, content, notebookId = null, type = 'markdown', file_url = null) => {
     try {
       const res = await fetch(`${API_URL}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, notebook_id: notebookId })
+        body: JSON.stringify({ title, content, notebook_id: notebookId, type, file_url })
       });
       const newNote = await res.json();
       set((state) => ({ notes: [...state.notes, newNote] }));
