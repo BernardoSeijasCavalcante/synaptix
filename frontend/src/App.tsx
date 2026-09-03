@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import Notes from './pages/Notes';
 import Network from './pages/Network';
+import { PromptModal } from './components/PromptModal';
 
 function Dashboard() {
   return (
@@ -36,6 +37,7 @@ function App() {
             <Route path="/network" element={<Network />} />
           </Routes>
         </main>
+        <PromptModal />
       </div>
     </BrowserRouter>
   );

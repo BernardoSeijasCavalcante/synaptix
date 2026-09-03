@@ -1,6 +1,7 @@
 import { useState, useRef, MouseEvent } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { useNotesStore } from '../store/useNotesStore';
+import { usePromptStore } from '../store/usePromptStore';
 import { useCommentsStore } from '../store/useCommentsStore';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, PanelRight } from 'lucide-react';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -75,7 +76,7 @@ export const DocumentViewer = ({
     if (selectionBox && selectionBox.w > 10 && selectionBox.h > 10) {
       if (!pageRef.current || !activeNote) return;
       
-      const content = prompt("Digite seu comentário para a área selecionada:");
+      const content = await usePromptStore.getState().openPrompt("Digite seu comentário para a área selecionada:");
       if (!content) {
         setSelectionBox(null);
         return;

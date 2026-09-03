@@ -12,6 +12,7 @@ import type { Connection, Edge, Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCommentsStore } from '../store/useCommentsStore';
 import { useNotesStore } from '../store/useNotesStore';
+import { usePromptStore } from '../store/usePromptStore';
 import { CommentNode } from './nodes/CommentNode';
 import { ObservationEdge } from './edges/ObservationEdge';
 
@@ -141,10 +142,10 @@ export const CommentMindMap: React.FC<CommentMindMapProps> = ({ onNavigateToNote
         return;
       }
 
-      const question = window.prompt("Digite a pergunta:");
+      const question = await usePromptStore.getState().openPrompt("Digite a pergunta:");
       if (!question) return;
       
-      const answer = window.prompt("Digite a resposta:");
+      const answer = await usePromptStore.getState().openPrompt("Digite a resposta:");
       if (!answer) return;
 
       const rect = event.currentTarget.getBoundingClientRect();

@@ -15,6 +15,7 @@ import { TextAlign } from '@tiptap/extension-text-align';
 import { all, createLowlight } from 'lowlight';
 import 'highlight.js/styles/github-dark.css';
 import { useNotesStore } from '../store/useNotesStore';
+import { usePromptStore } from '../store/usePromptStore';
 import { useCommentsStore } from '../store/useCommentsStore';
 import { Save, Trash, Bold, Italic, Strikethrough, Code, Table as TableIcon, Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, AlignLeft, AlignCenter, AlignRight, AlignJustify, MessageSquarePlus, PanelRight } from 'lucide-react';
 import { InputRule, Extension } from '@tiptap/core';
@@ -161,7 +162,7 @@ export const NoteEditor = () => {
     if (from === to) return;
     
     const selectedText = editor.state.doc.textBetween(from, to, ' ');
-    const content = prompt("Digite seu comentário:");
+    const content = await usePromptStore.getState().openPrompt("Digite seu comentário:");
     if (!content) return;
 
     const newComment = await createComment(activeNoteId, content, selectedText);

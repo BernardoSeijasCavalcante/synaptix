@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNotesStore } from '../store/useNotesStore';
+import { usePromptStore } from '../store/usePromptStore';
 import { Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import type { Notebook } from '../types';
 
@@ -19,18 +20,18 @@ const NotebookItem = ({ notebook, depth = 0 }: { notebook: Notebook; depth?: num
     setActiveNotebook(notebook.id);
   };
 
-  const handleAddSubNotebook = (e: React.MouseEvent) => {
+  const handleAddSubNotebook = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const title = prompt('Nome do sub-caderno:');
+    const title = await usePromptStore.getState().openPrompt('Nome do sub-caderno:');
     if (title) {
       createNotebook(title, notebook.id);
       setIsOpen(true);
     }
   };
 
-  const handleAddNote = (e: React.MouseEvent) => {
+  const handleAddNote = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const title = prompt('Nome da nova nota:');
+    const title = await usePromptStore.getState().openPrompt('Nome da nova nota:');
     if (title) {
       createNote(title, 'Comece a escrever...', notebook.id);
       setIsOpen(true);
@@ -128,19 +129,19 @@ export const Sidebar = () => {
   const rootNotebooks = notebooks.filter(n => n.parent_id === null);
   const orphanNotes = notes.filter(n => n.notebook_id === null);
 
-  const handleCreateRootNotebook = () => {
+  const handleCreateRootNotebook = async () => {
     if (!activeWorkspaceId) {
       alert("Por favor, selecione ou crie um Workspace primeiro.");
       return;
     }
-    const title = prompt('Nome do caderno:');
+    const title = await usePromptStore.getState().openPrompt('Nome do caderno:');
     if (title) {
       createNotebook(title);
     }
   };
 
-  const handleCreateWorkspace = () => {
-    const title = prompt('Nome do Workspace:');
+  const handleCreateWorkspace = async () => {
+    const title = await usePromptStore.getState().openPrompt('Nome do Workspace:');
     if (title) {
       createWorkspace(title);
     }
