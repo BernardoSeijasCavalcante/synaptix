@@ -17,11 +17,16 @@ def run():
     except Exception as e:
         pass
     
-    for col in ['rect_x1', 'rect_y1', 'rect_x2', 'rect_y2']:
+    for col in ['rect_x1', 'rect_y1', 'rect_x2', 'rect_y2', 'x_position', 'y_position', 'notebook_id']:
         try:
             conn.execute(f"ALTER TABLE comments ADD COLUMN {col} INTEGER")
         except Exception as e:
             pass
+            
+    try:
+        conn.execute("ALTER TABLE comments ADD COLUMN is_question BOOLEAN DEFAULT 0")
+    except Exception as e:
+        pass
 
     conn.commit()
     conn.close()

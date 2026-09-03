@@ -21,17 +21,22 @@ def seed_data():
 
     print("Iniciando seed de dados...")
 
+    # Workspace Principal
+    ws_principal = models.Workspace(title="Workspace Principal")
+    db.add(ws_principal)
+    db.commit()
+
     # Cadernos (Notebooks)
-    nb_livros = models.Notebook(title="📚 Livros Lidos")
-    nb_estudos = models.Notebook(title="🔬 Estudos e Projetos")
-    nb_dev = models.Notebook(title="💻 Desenvolvimento")
+    nb_livros = models.Notebook(title="📚 Livros Lidos", workspace_id=ws_principal.id)
+    nb_estudos = models.Notebook(title="🔬 Estudos e Projetos", workspace_id=ws_principal.id)
+    nb_dev = models.Notebook(title="💻 Desenvolvimento", workspace_id=ws_principal.id)
     
     db.add_all([nb_livros, nb_estudos, nb_dev])
     db.commit()
     
     # Subcadernos
-    nb_psico = models.Notebook(title="Psicologia", parent_id=nb_livros.id)
-    nb_stats = models.Notebook(title="Estatística", parent_id=nb_livros.id)
+    nb_psico = models.Notebook(title="Psicologia", parent_id=nb_livros.id, workspace_id=ws_principal.id)
+    nb_stats = models.Notebook(title="Estatística", parent_id=nb_livros.id, workspace_id=ws_principal.id)
     db.add_all([nb_psico, nb_stats])
     db.commit()
 
@@ -39,6 +44,7 @@ def seed_data():
     note_stats_1 = models.Note(
         title="Como Mentir com Estatística", 
         notebook_id=nb_stats.id,
+        workspace_id=ws_principal.id,
         content="""## Resumo do Livro
 Existem várias formas de distorcer a verdade usando números.
 
@@ -50,6 +56,7 @@ Além disso, preste atenção na média. Na estatística, existem três medidas 
     note_stats_2 = models.Note(
         title="Viés de Confirmação", 
         notebook_id=nb_psico.id,
+        workspace_id=ws_principal.id,
         content="""O viés de confirmação é a tendência de lembrar ou pesquisar informações de maneira que confirme crenças ou hipóteses iniciais.
         
 Isso é extremamente perigoso ao analisar dados brutos, conforme discutido em @[Como Mentir com Estatística](note:1)."""
@@ -63,32 +70,32 @@ Isso é extremamente perigoso ao analisar dados brutos, conforme discutido em @[
         note_id=note_stats_1.id,
         selected_text="Uma pesquisa só é válida se a amostra de pessoas consultadas representar fielmente a população total.",
         content="Isso me lembra do conceito de p-hacking. Precisamos sempre duvidar das fontes de amostra.",
-        x_position=100,
-        y_position=100
+        rect_x1=100,
+        rect_y1=100
     )
     
     c2 = models.Comment(
         note_id=note_stats_1.id,
         selected_text="Média Aritmética, Moda e Mediana",
         content="Empresas adoram usar a Moda quando a média aritmética os prejudica financeiramente nos relatórios.",
-        x_position=600,
-        y_position=200
+        rect_x1=600,
+        rect_y1=200
     )
     
     c3 = models.Comment(
         note_id=note_stats_2.id,
         selected_text="pesquisar informações de maneira que confirme crenças",
         content="Exemplo clássico: O algoritmo de redes sociais reforçando bolhas ideológicas. Ver a @[Como Mentir com Estatística](note:1).",
-        x_position=100,
-        y_position=500
+        rect_x1=100,
+        rect_y1=500
     )
     
     c4 = models.Comment(
         note_id=note_stats_1.id,
         selected_text="A amostra tendenciosa é o principal problema.",
         content="Ligação direta com o comportamento humano descrito na outra nota.",
-        x_position=600,
-        y_position=600
+        rect_x1=600,
+        rect_y1=600
     )
     
     db.add_all([c1, c2, c3, c4])

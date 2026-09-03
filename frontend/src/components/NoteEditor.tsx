@@ -104,7 +104,7 @@ export const NoteEditor = () => {
   }, [activeNoteId, editor]);
 
   const updateConnections = () => {
-    if (!containerRef.current || !editorRef.current || isMindMapExpanded) return;
+    if (!containerRef.current || isMindMapExpanded) return;
     const containerRect = containerRef.current.getBoundingClientRect();
     const newConnections: { id: number; path: string }[] = [];
 
@@ -271,6 +271,7 @@ export const NoteEditor = () => {
             setPageNumber={setPdfPageNumber} 
             isSidebarOpen={isSidebarOpen}
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+            onScroll={updateConnections}
           />
         ) : (
           <div className="flex-1 overflow-y-auto p-8 relative" ref={editorRef} onScroll={updateConnections}>

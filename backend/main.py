@@ -41,6 +41,42 @@ def upload_file(file: UploadFile = File(...)):
 def read_root():
     return {"message": "Welcome to Synaptix API"}
 
+# Workspace Endpoints
+@app.post("/workspaces", response_model=schemas.WorkspaceResponse)
+def create_workspace(workspace: schemas.WorkspaceCreate, db: Session = Depends(get_db)):
+    db_workspace = models.Workspace(**workspace.model_dump())
+    db.add(db_workspace)
+    db.commit()
+    db.refresh(db_workspace)
+    return db_workspace
+
+@app.get("/workspaces", response_model=List[schemas.WorkspaceResponse])
+def get_workspaces(db: Session = Depends(get_db)):
+    return db.query(models.Workspace).filter(models.Workspace.is_active == True).all()
+
+@app.put("/workspaces/{workspace_id}", response_model=schemas.WorkspaceResponse)
+def update_workspace(workspace_id: int, workspace: schemas.WorkspaceUpdate, db: Session = Depends(get_db)):
+    db_workspace = db.query(models.Workspace).filter(models.Workspace.id == workspace_id).first()
+    if not db_workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    
+    update_data = workspace.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_workspace, key, value)
+        
+    db.commit()
+    db.refresh(db_workspace)
+    return db_workspace
+
+@app.delete("/workspaces/{workspace_id}")
+def delete_workspace(workspace_id: int, db: Session = Depends(get_db)):
+    db_workspace = db.query(models.Workspace).filter(models.Workspace.id == workspace_id).first()
+    if not db_workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    db_workspace.is_active = False
+    db.commit()
+    return {"message": "Workspace inactived"}
+
 # Notebook Endpoints
 @app.post("/notebooks", response_model=schemas.NotebookResponse)
 def create_notebook(notebook: schemas.NotebookCreate, db: Session = Depends(get_db)):
@@ -51,8 +87,11 @@ def create_notebook(notebook: schemas.NotebookCreate, db: Session = Depends(get_
     return db_notebook
 
 @app.get("/notebooks", response_model=List[schemas.NotebookResponse])
-def get_notebooks(db: Session = Depends(get_db)):
-    return db.query(models.Notebook).filter(models.Notebook.is_active == True).all()
+def get_notebooks(workspace_id: int = None, db: Session = Depends(get_db)):
+    query = db.query(models.Notebook).filter(models.Notebook.is_active == True)
+    if workspace_id is not None:
+        query = query.filter(models.Notebook.workspace_id == workspace_id)
+    return query.all()
 
 @app.put("/notebooks/{notebook_id}", response_model=schemas.NotebookResponse)
 def update_notebook(notebook_id: int, notebook: schemas.NotebookUpdate, db: Session = Depends(get_db)):
@@ -78,10 +117,12 @@ def create_note(note: schemas.NoteCreate, db: Session = Depends(get_db)):
     return db_note
 
 @app.get("/notes", response_model=List[schemas.NoteResponse])
-def get_notes(notebook_id: int = None, db: Session = Depends(get_db)):
+def get_notes(notebook_id: int = None, workspace_id: int = None, db: Session = Depends(get_db)):
     query = db.query(models.Note)
     if notebook_id is not None:
         query = query.filter(models.Note.notebook_id == notebook_id)
+    if workspace_id is not None:
+        query = query.filter(models.Note.workspace_id == workspace_id)
     return query.all()
 
 @app.put("/notes/{note_id}", response_model=schemas.NoteResponse)
@@ -151,10 +192,21 @@ def get_notebook_comments(notebook_id: int, db: Session = Depends(get_db)):
     notes = db.query(models.Note).filter(models.Note.notebook_id == notebook_id).all()
     note_ids = [note.id for note in notes]
     
-    # Get all comments for these notes
-    if not note_ids:
-        return []
-    return db.query(models.Comment).filter(models.Comment.note_id.in_(note_ids)).all()
+    # Get all comments for these notes AND questions for this notebook
+    return db.query(models.Comment).filter(
+        (models.Comment.note_id.in_(note_ids)) | 
+        (models.Comment.notebook_id == notebook_id)
+    ).all()
+
+@app.post("/notebooks/{notebook_id}/questions", response_model=schemas.CommentResponse)
+def create_notebook_question(notebook_id: int, comment: schemas.CommentCreate, db: Session = Depends(get_db)):
+    if comment.notebook_id != notebook_id:
+        raise HTTPException(status_code=400, detail="Path notebook_id does not match payload notebook_id")
+    db_comment = models.Comment(**comment.model_dump())
+    db.add(db_comment)
+    db.commit()
+    db.refresh(db_comment)
+    return db_comment
 
 # Comment Connection Endpoints
 @app.post("/comment-connections", response_model=schemas.CommentConnectionResponse)

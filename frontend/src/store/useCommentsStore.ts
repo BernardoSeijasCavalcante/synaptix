@@ -10,6 +10,7 @@ interface CommentsState {
   fetchComments: (noteId: number) => Promise<void>;
   fetchNotebookComments: (notebookId: number) => Promise<void>;
   createComment: (noteId: number, content: string, selectedText?: string, page_number?: number | null, rect_x1?: number | null, rect_y1?: number | null, rect_x2?: number | null, rect_y2?: number | null) => Promise<Comment | null>;
+  createQuestion: (notebookId: number, question: string, answer: string, x?: number, y?: number) => Promise<Comment | null>;
   updateComment: (id: number, content: string) => Promise<void>;
   updateCommentPosition: (id: number, x: number, y: number) => Promise<void>;
   deleteComment: (id: number) => Promise<void>;
@@ -57,6 +58,22 @@ export const useCommentsStore = create<CommentsState>((set) => ({
       return newComment;
     } catch (error) {
       console.error('Error creating comment', error);
+      return null;
+    }
+  },
+
+  createQuestion: async (notebookId, question, answer, x, y) => {
+    try {
+      const res = await fetch(`${API_URL}/notebooks/${notebookId}/questions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notebook_id: notebookId, content: answer, selected_text: question, is_question: true, x_position: x, y_position: y })
+      });
+      const newQuestion = await res.json();
+      set((state) => ({ comments: [...state.comments, newQuestion] }));
+      return newQuestion;
+    } catch (error) {
+      console.error('Error creating question', error);
       return null;
     }
   },

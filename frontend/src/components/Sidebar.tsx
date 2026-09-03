@@ -116,25 +116,81 @@ const NotebookItem = ({ notebook, depth = 0 }: { notebook: Notebook; depth?: num
 };
 
 export const Sidebar = () => {
-  const { notebooks, fetchNotebooks, fetchNotes, createNotebook, notes, activeNoteId, setActiveNote } = useNotesStore();
+  const { 
+    workspaces, activeWorkspaceId, setActiveWorkspace, createWorkspace, inactivateWorkspace, fetchWorkspaces,
+    notebooks, fetchNotebooks, fetchNotes, createNotebook, notes, activeNoteId, setActiveNote 
+  } = useNotesStore();
 
   useEffect(() => {
-    fetchNotebooks();
-    fetchNotes(); // Fetch all notes initially
-  }, []);
+    fetchWorkspaces();
+  }, []); // fetchWorkspaces already calls fetchNotebooks and fetchNotes if needed, or when activeWorkspace changes
 
   const rootNotebooks = notebooks.filter(n => n.parent_id === null);
   const orphanNotes = notes.filter(n => n.notebook_id === null);
 
   const handleCreateRootNotebook = () => {
+    if (!activeWorkspaceId) {
+      alert("Por favor, selecione ou crie um Workspace primeiro.");
+      return;
+    }
     const title = prompt('Nome do caderno:');
     if (title) {
       createNotebook(title);
     }
   };
 
+  const handleCreateWorkspace = () => {
+    const title = prompt('Nome do Workspace:');
+    if (title) {
+      createWorkspace(title);
+    }
+  };
+
+  const handleInactivateWorkspace = () => {
+    if (activeWorkspaceId && confirm("Deseja inativar o Workspace atual?")) {
+      inactivateWorkspace(activeWorkspaceId);
+    }
+  };
+
   return (
     <div className="w-72 bg-slate-950 h-full flex flex-col border-r border-slate-800 shrink-0">
+      {/* Workspace Selector Section */}
+      <div className="p-4 border-b border-slate-800 flex flex-col gap-2">
+        <div className="flex justify-between items-center">
+          <h2 className="text-gray-400 font-bold tracking-wider uppercase text-xs">Workspace</h2>
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={handleCreateWorkspace}
+              className="text-gray-400 hover:text-white p-1"
+              title="Novo Workspace"
+            >
+              <Plus size={14} />
+            </button>
+            {activeWorkspaceId && (
+              <button 
+                onClick={handleInactivateWorkspace}
+                className="text-gray-400 hover:text-red-400 p-1"
+                title="Inativar Workspace"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+        <select 
+          className="w-full bg-slate-900 border border-slate-700 text-sm text-gray-200 rounded p-1.5 focus:outline-none focus:border-yellow-500"
+          value={activeWorkspaceId || ''}
+          onChange={(e) => setActiveWorkspace(Number(e.target.value) || null)}
+        >
+          {workspaces.length === 0 && (
+            <option value="" disabled>Nenhum Workspace</option>
+          )}
+          {workspaces.map(ws => (
+            <option key={ws.id} value={ws.id}>{ws.title}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="p-4 border-b border-slate-800 flex justify-between items-center">
         <h2 className="text-yellow-500 font-bold tracking-wider uppercase text-sm">Meus Cadernos</h2>
         <button 

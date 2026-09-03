@@ -23,7 +23,7 @@ interface CommentMindMapProps {
 }
 
 export const CommentMindMap: React.FC<CommentMindMapProps> = ({ onNavigateToNote }) => {
-  const { comments, connections, fetchNotebookComments, fetchNotebookConnections, createConnection, updateConnectionObservation } = useCommentsStore();
+  const { comments, connections, fetchNotebookComments, fetchNotebookConnections, createConnection, updateConnectionObservation, createQuestion } = useCommentsStore();
   const { activeNotebookId, notes } = useNotesStore();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -79,6 +79,7 @@ export const CommentMindMap: React.FC<CommentMindMapProps> = ({ onNavigateToNote
             note_title: note?.title || 'Nota Desconhecida',
             content: comment.content,
             selected_text: comment.selected_text,
+            is_question: comment.is_question,
             onTitleClick: onNavigateToNote,
           },
         };
@@ -130,6 +131,31 @@ export const CommentMindMap: React.FC<CommentMindMapProps> = ({ onNavigateToNote
     }
   }, [createConnection, updateConnectionObservation]);
 
+
+  const onPaneContextMenu = useCallback(
+    async (event: React.MouseEvent) => {
+      event.preventDefault();
+      
+      if (!activeNotebookId) {
+        alert("Selecione um notebook para criar uma pergunta.");
+        return;
+      }
+
+      const question = window.prompt("Digite a pergunta:");
+      if (!question) return;
+      
+      const answer = window.prompt("Digite a resposta:");
+      if (!answer) return;
+
+      const rect = event.currentTarget.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+
+      await createQuestion(activeNotebookId, question, answer, x, y);
+    },
+    [activeNotebookId, createQuestion]
+  );
+
   return (
     <div className="w-full h-full bg-slate-950 relative">
       <ReactFlow
@@ -139,6 +165,7 @@ export const CommentMindMap: React.FC<CommentMindMapProps> = ({ onNavigateToNote
         onEdgesChange={onEdgesChange}
         onNodeDragStop={onNodeDragStop}
         onConnect={onConnect}
+        onPaneContextMenu={onPaneContextMenu}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView

@@ -14,13 +14,15 @@ export const DocumentViewer = ({
   pageNumber, 
   setPageNumber,
   isSidebarOpen,
-  onToggleSidebar
+  onToggleSidebar,
+  onScroll
 }: { 
   hoveredCommentId: number | null, 
   pageNumber: number, 
   setPageNumber: (page: number | ((p: number) => number)) => void,
   isSidebarOpen?: boolean,
-  onToggleSidebar?: () => void
+  onToggleSidebar?: () => void,
+  onScroll?: () => void
 }) => {
   const { notes, activeNoteId } = useNotesStore();
   const { comments, createComment } = useCommentsStore();
@@ -146,7 +148,7 @@ export const DocumentViewer = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-slate-950 p-8 flex justify-center relative select-none">
+      <div className="flex-1 overflow-auto bg-slate-950 p-8 flex justify-center relative select-none" onScroll={onScroll}>
         <div 
           className="relative inline-block shadow-2xl" 
           ref={pageRef}
