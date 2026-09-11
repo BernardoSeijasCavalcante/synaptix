@@ -13,6 +13,7 @@ interface CommentsState {
   createQuestion: (notebookId: number, question: string, answer: string, x?: number, y?: number) => Promise<Comment | null>;
   updateComment: (id: number, content: string) => Promise<void>;
   updateCommentPosition: (id: number, x: number, y: number) => Promise<void>;
+  updateCommentRect: (id: number, rect_x1: number, rect_y1: number, rect_x2: number, rect_y2: number, page_number: number) => Promise<void>;
   deleteComment: (id: number) => Promise<void>;
   clearComments: () => void;
 
@@ -107,6 +108,22 @@ export const useCommentsStore = create<CommentsState>((set) => ({
       }));
     } catch (error) {
       console.error('Error updating comment position', error);
+    }
+  },
+
+  updateCommentRect: async (id, rect_x1, rect_y1, rect_x2, rect_y2, page_number) => {
+    try {
+      const res = await fetch(`${API_URL}/comments/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rect_x1, rect_y1, rect_x2, rect_y2, page_number })
+      });
+      const updatedComment = await res.json();
+      set((state) => ({
+        comments: state.comments.map((c) => (c.id === id ? updatedComment : c))
+      }));
+    } catch (error) {
+      console.error('Error updating comment rect', error);
     }
   },
 

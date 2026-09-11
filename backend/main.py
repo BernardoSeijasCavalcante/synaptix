@@ -11,10 +11,32 @@ import models
 import schemas
 from database import engine, get_db
 
+import logging
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 # Create DB tables
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Synaptix API")
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"Receiving request: {request.method} {request.url}")
+    try:
+        response = await call_next(request)
+        logger.info(f"Returning response: {response.status_code}")
+        return response
+    except Exception as e:
+        logger.error(f"Error handling request: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"detail": str(e)})
 
 os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
@@ -22,7 +44,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # Allow CORS for local Vite dev server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"], # Permitindo tudo para garantir
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -200,12 +222,15 @@ def get_notebook_comments(notebook_id: int, db: Session = Depends(get_db)):
 
 @app.post("/notebooks/{notebook_id}/questions", response_model=schemas.CommentResponse)
 def create_notebook_question(notebook_id: int, comment: schemas.CommentCreate, db: Session = Depends(get_db)):
+    logger.info(f"Recebido pedido para criar pergunta no notebook_id={notebook_id}")
     if comment.notebook_id != notebook_id:
+        logger.warning("notebook_id no path difere do payload")
         raise HTTPException(status_code=400, detail="Path notebook_id does not match payload notebook_id")
     db_comment = models.Comment(**comment.model_dump())
     db.add(db_comment)
     db.commit()
     db.refresh(db_comment)
+    logger.info(f"Pergunta criada com sucesso! ID: {db_comment.id}")
     return db_comment
 
 # Comment Connection Endpoints

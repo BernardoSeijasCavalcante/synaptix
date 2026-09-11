@@ -141,16 +141,16 @@ export const CommentMindMap: React.FC<CommentMindMapProps> = ({ onNavigateToNote
         alert("Selecione um notebook para criar uma pergunta.");
         return;
       }
+      // Calculate coordinates synchronously before any await
+      const rect = (event.currentTarget as Element).getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
 
       const question = await usePromptStore.getState().openPrompt("Digite a pergunta:");
       if (!question) return;
       
       const answer = await usePromptStore.getState().openPrompt("Digite a resposta:");
       if (!answer) return;
-
-      const rect = event.currentTarget.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
 
       await createQuestion(activeNotebookId, question, answer, x, y);
     },

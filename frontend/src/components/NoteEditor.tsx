@@ -52,6 +52,7 @@ export const NoteEditor = () => {
   const [isMindMapExpanded, setIsMindMapExpanded] = useState(false);
   const [pdfPageNumber, setPdfPageNumber] = useState(1);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [editingCommentRectId, setEditingCommentRectId] = useState<number | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -59,7 +60,9 @@ export const NoteEditor = () => {
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        codeBlock: false,
+      }),
       Markdown.configure({ html: true }),
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -273,6 +276,8 @@ export const NoteEditor = () => {
             isSidebarOpen={isSidebarOpen}
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
             onScroll={updateConnections}
+            editingCommentRectId={editingCommentRectId}
+            setEditingCommentRectId={setEditingCommentRectId}
           />
         ) : (
           <div className="flex-1 overflow-y-auto p-8 relative" ref={editorRef} onScroll={updateConnections}>
@@ -360,6 +365,8 @@ export const NoteEditor = () => {
               hoveredCommentId={hoveredCommentId} 
               isMindMapExpanded={isMindMapExpanded}
               onToggleMindMap={() => setIsMindMapExpanded(!isMindMapExpanded)}
+              editingCommentRectId={editingCommentRectId}
+              setEditingCommentRectId={setEditingCommentRectId}
             />
           </div>
         )}

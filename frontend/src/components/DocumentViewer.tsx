@@ -16,17 +16,21 @@ export const DocumentViewer = ({
   setPageNumber,
   isSidebarOpen,
   onToggleSidebar,
-  onScroll
+  onScroll,
+  editingCommentRectId,
+  setEditingCommentRectId
 }: { 
   hoveredCommentId: number | null, 
   pageNumber: number, 
   setPageNumber: (page: number | ((p: number) => number)) => void,
   isSidebarOpen?: boolean,
   onToggleSidebar?: () => void,
-  onScroll?: () => void
+  onScroll?: () => void,
+  editingCommentRectId?: number | null,
+  setEditingCommentRectId?: (id: number | null) => void
 }) => {
   const { notes, activeNoteId } = useNotesStore();
-  const { comments, createComment } = useCommentsStore();
+  const { comments, createComment, updateCommentRect } = useCommentsStore();
   const activeNote = notes.find(n => n.id === activeNoteId);
 
   const [numPages, setNumPages] = useState<number>();
@@ -76,20 +80,23 @@ export const DocumentViewer = ({
     if (selectionBox && selectionBox.w > 10 && selectionBox.h > 10) {
       if (!pageRef.current || !activeNote) return;
       
-      const content = await usePromptStore.getState().openPrompt("Digite seu comentário para a área selecionada:");
-      if (!content) {
-        setSelectionBox(null);
-        return;
-      }
-      
       const rect = pageRef.current.getBoundingClientRect();
-      // Store as percentages * 10000 for integer precision
       const rect_x1 = Math.round((selectionBox.x / rect.width) * 10000);
       const rect_y1 = Math.round((selectionBox.y / rect.height) * 10000);
       const rect_x2 = Math.round(((selectionBox.x + selectionBox.w) / rect.width) * 10000);
       const rect_y2 = Math.round(((selectionBox.y + selectionBox.h) / rect.height) * 10000);
 
-      await createComment(activeNote.id, content, '', pageNumber, rect_x1, rect_y1, rect_x2, rect_y2);
+      if (editingCommentRectId) {
+        await updateCommentRect(editingCommentRectId, rect_x1, rect_y1, rect_x2, rect_y2, pageNumber);
+        setEditingCommentRectId?.(null);
+      } else {
+        const content = await usePromptStore.getState().openPrompt("Digite seu comentário para a área selecionada:");
+        if (!content) {
+          setSelectionBox(null);
+          return;
+        }
+        await createComment(activeNote.id, content, '', pageNumber, rect_x1, rect_y1, rect_x2, rect_y2);
+      }
       setSelectionBox(null);
     } else {
       setSelectionBox(null);
@@ -149,9 +156,21 @@ export const DocumentViewer = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-slate-950 p-8 flex justify-center relative select-none" onScroll={onScroll}>
+      {editingCommentRectId && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-yellow-500 text-slate-900 px-4 py-2 rounded-full font-medium shadow-lg flex items-center gap-2">
+          <span>Selecione a nova área para o comentário no documento</span>
+          <button 
+            onClick={() => setEditingCommentRectId?.(null)}
+            className="p-1 hover:bg-yellow-600 rounded-full transition-colors"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-auto bg-slate-950 p-8 flex justify-center items-start relative select-none" onScroll={onScroll}>
         <div 
-          className="relative inline-block shadow-2xl" 
+          className={`relative inline-block w-fit h-fit shadow-2xl ${editingCommentRectId ? 'cursor-crosshair ring-4 ring-yellow-500/50' : ''}`} 
           ref={pageRef}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}

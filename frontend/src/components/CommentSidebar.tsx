@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCommentsStore } from '../store/useCommentsStore';
-import { Trash2, Network } from 'lucide-react';
+import { Trash2, Network, ScanText, X } from 'lucide-react';
 import { CommentBox } from './CommentBox';
 
 interface CommentSidebarProps {
@@ -9,6 +9,8 @@ interface CommentSidebarProps {
   onToggleMindMap: () => void;
   isMindMapExpanded: boolean;
   onClickComment?: (page: number | null | undefined) => void;
+  editingCommentRectId?: number | null;
+  setEditingCommentRectId?: (id: number | null) => void;
 }
 
 export const CommentSidebar: React.FC<CommentSidebarProps> = ({ 
@@ -16,7 +18,9 @@ export const CommentSidebar: React.FC<CommentSidebarProps> = ({
   hoveredCommentId,
   onToggleMindMap,
   isMindMapExpanded,
-  onClickComment
+  onClickComment,
+  editingCommentRectId,
+  setEditingCommentRectId
 }) => {
   const { comments, deleteComment, updateComment } = useCommentsStore();
 
@@ -78,13 +82,31 @@ export const CommentSidebar: React.FC<CommentSidebarProps> = ({
               }
             }} 
           />
-          <button 
-            onClick={() => deleteComment(comment.id)}
-            className="absolute top-2 right-2 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-            style={{ opacity: hoveredCommentId === comment.id ? 1 : undefined }}
-          >
-            <Trash2 size={14} />
-          </button>
+          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ opacity: hoveredCommentId === comment.id ? 1 : undefined }}>
+            {comment.rect_x1 != null && setEditingCommentRectId && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (editingCommentRectId === comment.id) {
+                    setEditingCommentRectId(null);
+                  } else {
+                    setEditingCommentRectId(comment.id);
+                  }
+                }}
+                className={`p-1 rounded transition-colors ${editingCommentRectId === comment.id ? 'bg-yellow-500/20 text-yellow-400' : 'text-gray-500 hover:text-yellow-400'}`}
+                title={editingCommentRectId === comment.id ? "Cancelar re-seleção" : "Refazer seleção de área"}
+              >
+                {editingCommentRectId === comment.id ? <X size={14} /> : <ScanText size={14} />}
+              </button>
+            )}
+            <button 
+              onClick={(e) => { e.stopPropagation(); deleteComment(comment.id); }}
+              className="p-1 text-gray-500 hover:text-red-400"
+              title="Excluir"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
           <div className="text-[10px] text-gray-600 mt-1 text-right">
             {new Date(comment.created_at).toLocaleDateString()}
           </div>
