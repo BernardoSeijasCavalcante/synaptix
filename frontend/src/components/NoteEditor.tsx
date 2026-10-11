@@ -367,6 +367,16 @@ export const NoteEditor = () => {
               onToggleMindMap={() => setIsMindMapExpanded(!isMindMapExpanded)}
               editingCommentRectId={editingCommentRectId}
               setEditingCommentRectId={setEditingCommentRectId}
+              onClickComment={(page, commentId) => {
+                if (page != null) {
+                  setPdfPageNumber(page);
+                } else if (activeNote.type !== 'pdf') {
+                  const el = document.querySelector(`mark[data-comment-id="${commentId}"]`);
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                }
+              }}
             />
           </div>
         )}

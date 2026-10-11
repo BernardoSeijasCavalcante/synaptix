@@ -67,6 +67,19 @@ export function ObservationEdge({
                   }
                 }}
               />
+              <button 
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (data?.onDeleteConnection && typeof data.onDeleteConnection === 'function') {
+                    data.onDeleteConnection(data.connectionId);
+                  }
+                }}
+                className="absolute -top-3 -right-3 w-6 h-6 bg-red-600 rounded-full text-white flex items-center justify-center hover:bg-red-500 shadow-md border-2 border-slate-800"
+                title="Excluir Conexão"
+              >
+                &times;
+              </button>
             </div>
           )}
         </div>

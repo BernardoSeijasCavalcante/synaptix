@@ -34,27 +34,28 @@ export default function Network() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)]">
-      <div className="p-4 border-b bg-white flex justify-between items-center shadow-sm z-10">
-        <h2 className="text-xl font-bold">Rede Sináptica</h2>
+    <div className="flex flex-col h-[calc(100vh-64px)] bg-[#0a1128]">
+      <div className="p-4 border-b border-slate-800 bg-slate-950 flex justify-between items-center shadow-sm z-10">
+        <h2 className="text-xl font-bold text-gray-200">Rede Sináptica</h2>
         <button 
           onClick={carregarGrafoBackend}
-          className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
+          className="bg-purple-600/20 text-purple-400 border border-purple-600/30 px-4 py-2 rounded hover:bg-purple-600/30 transition"
         >
           Analisar com IA
         </button>
       </div>
-      <div className="flex-1 w-full bg-gray-50 relative">
+      <div className="flex-1 w-full relative">
         <ReactFlow
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           fitView
+          colorMode="dark"
         >
-          <Background />
-          <Controls />
-          <MiniMap />
+          <Background color="#334155" />
+          <Controls className="bg-slate-900 border-slate-800" />
+          <MiniMap className="bg-slate-900" nodeColor="#eab308" maskColor="rgba(0,0,0,0.5)" />
         </ReactFlow>
       </div>
     </div>

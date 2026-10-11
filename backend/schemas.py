@@ -127,3 +127,84 @@ class CommentConnectionResponse(CommentConnectionBase):
     
     class Config:
         from_attributes = True
+
+# Task Schemas
+class TaskBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    priority: Optional[str] = "medium"
+    difficulty: Optional[str] = "medium"
+    estimated_hours: Optional[int] = 0
+    status: Optional[str] = "pending"
+    workspace_id: Optional[int] = None
+    notebook_id: Optional[int] = None
+
+class TaskCreate(TaskBase):
+    pass
+
+class TaskUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    priority: Optional[str] = None
+    difficulty: Optional[str] = None
+    estimated_hours: Optional[int] = None
+    status: Optional[str] = None
+    workspace_id: Optional[int] = None
+    notebook_id: Optional[int] = None
+    time_spent_seconds: Optional[int] = None
+    timer_status: Optional[str] = None
+
+class TaskResponse(TaskBase):
+    id: int
+    time_spent_seconds: int
+    timer_status: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Event Schemas
+class EventBase(BaseModel):
+    title: str
+    start_time: datetime
+    end_time: datetime
+    attendees: Optional[str] = None
+
+class EventCreate(EventBase):
+    pass
+
+class EventUpdate(BaseModel):
+    title: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    attendees: Optional[str] = None
+
+class EventResponse(EventBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Notification Schemas
+class NotificationBase(BaseModel):
+    message: str
+    scheduled_for: datetime
+    is_sent: Optional[bool] = False
+
+class NotificationCreate(NotificationBase):
+    pass
+
+class NotificationUpdate(BaseModel):
+    message: Optional[str] = None
+    scheduled_for: Optional[datetime] = None
+    is_sent: Optional[bool] = None
+
+class NotificationResponse(NotificationBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

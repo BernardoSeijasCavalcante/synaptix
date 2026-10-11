@@ -93,6 +93,10 @@ export const CommentMindMap: React.FC<CommentMindMapProps> = ({ onNavigateToNote
       updateConnectionObservation(connId, obs);
     };
 
+    const handleDeleteConnection = (connId: number) => {
+      useCommentsStore.getState().deleteConnection(connId);
+    };
+
     // Generate edges from connections
     const newEdges = connections.map(conn => ({
       id: `e-${conn.id}`,
@@ -103,6 +107,7 @@ export const CommentMindMap: React.FC<CommentMindMapProps> = ({ onNavigateToNote
         connectionId: conn.id,
         observation: conn.observation,
         onSaveObservation: handleSaveObservation,
+        onDeleteConnection: handleDeleteConnection,
       }
     }));
 
@@ -125,12 +130,26 @@ export const CommentMindMap: React.FC<CommentMindMapProps> = ({ onNavigateToNote
             observation: null,
             onSaveObservation: (connId: number, obs: string) => {
               updateConnectionObservation(connId, obs);
+            },
+            onDeleteConnection: (connId: number) => {
+              useCommentsStore.getState().deleteConnection(connId);
             }
           }
         }, eds));
       }
     }
   }, [createConnection, updateConnectionObservation]);
+
+  const onEdgesDelete = useCallback(
+    (edgesToDelete: Edge[]) => {
+      edgesToDelete.forEach((edge) => {
+        if (edge.data?.connectionId) {
+          useCommentsStore.getState().deleteConnection(edge.data.connectionId as number);
+        }
+      });
+    },
+    []
+  );
 
 
   const onPaneContextMenu = useCallback(
@@ -164,6 +183,7 @@ export const CommentMindMap: React.FC<CommentMindMapProps> = ({ onNavigateToNote
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onEdgesDelete={onEdgesDelete}
         onNodeDragStop={onNodeDragStop}
         onConnect={onConnect}
         onPaneContextMenu={onPaneContextMenu}

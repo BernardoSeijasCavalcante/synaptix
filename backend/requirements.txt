@@ -1,5 +1,9 @@
 fastapi
+python-dotenv
 uvicorn
 sqlalchemy
 pydantic
 python-multipart
+openai
+apscheduler
+sqlite-vec

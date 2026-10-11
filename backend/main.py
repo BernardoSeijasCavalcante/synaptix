@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()  # Carrega as chaves do arquivo .env antes de carregar o resto
+
 import shutil
 import uuid
 from fastapi import FastAPI, Depends, HTTPException, File, UploadFile
@@ -6,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
+from pydantic import BaseModel
 
 import models
 import schemas
@@ -15,6 +19,9 @@ import logging
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from core_scheduler import scheduler
+import agent_core
+
 # Configurar logging
 logging.basicConfig(
     level=logging.INFO,
@@ -22,10 +29,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Start Background Scheduler
+if not scheduler.running:
+    scheduler.start()
+
 # Create DB tables
 models.Base.metadata.create_all(bind=engine)
 
+# Initialize vector tables
+from vector_db import init_vector_db
+init_vector_db()
+
 app = FastAPI(title="Synaptix API")
+
+@app.on_event("shutdown")
+def shutdown_event():
+    scheduler.shutdown()
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -49,6 +68,98 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+class ChatRequest(BaseModel):
+    messages: List[dict]
+
+@app.get("/chat/sessions")
+def get_all_chat_sessions(db: Session = Depends(get_db)):
+    # Retorna as datas de todas as sessoes ordenadas da mais recente pra mais antiga
+    sessions = db.query(models.ChatSession.date).order_by(models.ChatSession.date.desc()).all()
+    return [s[0] for s in sessions]
+
+@app.get("/chat/session/{date}")
+def get_chat_session_by_date(date: str, db: Session = Depends(get_db)):
+    import json
+    session = db.query(models.ChatSession).filter(models.ChatSession.date == date).first()
+    if not session:
+        return []
+    return json.loads(session.messages_json)
+
+@app.get("/chat/session")
+def get_chat_session(db: Session = Depends(get_db)):
+    from datetime import datetime
+    import json
+    today = datetime.now().strftime("%Y-%m-%d")
+    session = db.query(models.ChatSession).filter(models.ChatSession.date == today).first()
+    if not session:
+        session = models.ChatSession(date=today, messages_json="[]")
+        db.add(session)
+        db.commit()
+    return json.loads(session.messages_json)
+
+@app.post("/chat/session/clear")
+def clear_chat_session(db: Session = Depends(get_db)):
+    from datetime import datetime
+    import json
+    today = datetime.now().strftime("%Y-%m-%d")
+    session = db.query(models.ChatSession).filter(models.ChatSession.date == today).first()
+    if session:
+        session.messages_json = "[]"
+        db.commit()
+    return {"success": True}
+
+@app.post("/chat")
+def chat_endpoint(request: ChatRequest, db: Session = Depends(get_db)):
+    from datetime import datetime
+    import json
+    try:
+        result = agent_core.chat_with_agent(request.messages)
+        
+        # Save to today's session
+        today = datetime.now().strftime("%Y-%m-%d")
+        session = db.query(models.ChatSession).filter(models.ChatSession.date == today).first()
+        if not session:
+            session = models.ChatSession(date=today)
+            db.add(session)
+        
+        session.messages_json = json.dumps(result["messages"])
+        db.commit()
+        
+        return result
+    except Exception as e:
+        logger.error(f"Chat error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/notifications/unread")
+def get_unread_notifications(db: Session = Depends(get_db)):
+    from datetime import datetime
+    now = datetime.utcnow()
+    # Pega notificacoes cujo horario agendado ja passou e que ainda nao foram enviadas
+    notifications = db.query(models.Notification).filter(
+        models.Notification.is_sent == False,
+        models.Notification.scheduled_for <= now
+    ).all()
+    return notifications
+
+@app.post("/notifications/{notification_id}/read")
+def mark_notification_read(notification_id: int, db: Session = Depends(get_db)):
+    notification = db.query(models.Notification).filter(models.Notification.id == notification_id).first()
+    if notification:
+        notification.is_sent = True
+        db.commit()
+    return {"success": True}
+
+@app.get("/tasks")
+def get_all_tasks(db: Session = Depends(get_db)):
+    tasks = db.query(models.Task).all()
+    return tasks
+
+@app.get("/tasks/active")
+def get_active_tasks(db: Session = Depends(get_db)):
+    # Retorna tarefas com cronometro rodando
+    tasks = db.query(models.Task).filter(models.Task.timer_status == "running").all()
+    return tasks
 
 @app.post("/upload")
 def upload_file(file: UploadFile = File(...)):

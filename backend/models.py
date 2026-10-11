@@ -83,3 +83,49 @@ class CommentConnection(Base):
 
     source_comment = relationship("Comment", foreign_keys=[source_comment_id], back_populates="connections_out")
     target_comment = relationship("Comment", foreign_keys=[target_comment_id], back_populates="connections_in")
+
+class Task(Base):
+    __tablename__ = "tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    description = Column(Text, nullable=True)
+    priority = Column(String, default="medium")
+    difficulty = Column(String, default="medium")
+    estimated_hours = Column(Integer, default=0)
+    status = Column(String, default="pending")
+    time_spent_seconds = Column(Integer, default=0)
+    timer_status = Column(String, default="stopped")
+    timer_started_at = Column(DateTime, nullable=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id"), nullable=True)
+    notebook_id = Column(Integer, ForeignKey("notebooks.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+class Event(Base):
+    __tablename__ = "events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True)
+    start_time = Column(DateTime, index=True)
+    end_time = Column(DateTime, index=True)
+    attendees = Column(Text, nullable=True) # comma separated list of emails/names
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+    
+    date = Column(String, primary_key=True, index=True) # Formato YYYY-MM-DD
+    messages_json = Column(Text, default="[]")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    message = Column(Text)
+    scheduled_for = Column(DateTime, index=True)
+    is_sent = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
