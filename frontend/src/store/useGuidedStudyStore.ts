@@ -17,6 +17,8 @@ interface GuidedStudyState {
   isInitializingSession: boolean;
   isSendingTurn: boolean;
   isExtractingFile: boolean;
+  isAskingDoubt: boolean;
+  raisingHandForMessageId: string | null;
   error: string | null;
 
   // Drawer visibility
@@ -45,6 +47,9 @@ interface GuidedStudyState {
     autoCreateSynapse?: boolean
   ) => Promise<any>;
 
+  raiseHand: (parentMessageId: string, doubtText: string, threadId?: string) => Promise<boolean>;
+  resolveDoubt: (parentMessageId: string, threadId: string) => Promise<boolean>;
+
   extractFile: (file: File) => Promise<ExtractFileResponse | null>;
   crystallizeSynapse: (messageId: string, customObservation?: string) => Promise<number | null>;
   rebuildRoadmap: (sessionId: number, surfacePace?: 'fast' | 'standard' | 'detailed') => Promise<boolean>;
@@ -63,6 +68,8 @@ export const useGuidedStudyStore = create<GuidedStudyState>((set, get) => ({
   isInitializingSession: false,
   isSendingTurn: false,
   isExtractingFile: false,
+  isAskingDoubt: false,
+  raisingHandForMessageId: null,
   error: null,
 
   openDrawer: () => set({ isOpen: true }),
@@ -391,6 +398,63 @@ export const useGuidedStudyStore = create<GuidedStudyState>((set, get) => ({
     } catch (err: any) {
       console.error('Erro ao gerar recurso visual:', err);
       return null;
+    }
+  },
+
+  raiseHand: async (parentMessageId: string, doubtText: string, threadId?: string) => {
+    const session = get().activeSession;
+    if (!session) return false;
+
+    set({ isAskingDoubt: true, raisingHandForMessageId: parentMessageId });
+    try {
+      const res = await fetch(`${API_URL}/guided-study/sessions/${session.id}/raise-hand`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parent_message_id: parentMessageId,
+          doubt_text: doubtText,
+          thread_id: threadId || null
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('Falha ao processar dúvida');
+      }
+
+      const updated: GuidedStudySession = await res.json();
+      set({ activeSession: updated, isAskingDoubt: false, raisingHandForMessageId: null });
+      return true;
+    } catch (err: any) {
+      console.error('Erro ao levantar a mão / tirar dúvida:', err);
+      set({ isAskingDoubt: false, raisingHandForMessageId: null });
+      return false;
+    }
+  },
+
+  resolveDoubt: async (parentMessageId: string, threadId: string) => {
+    const session = get().activeSession;
+    if (!session) return false;
+
+    try {
+      const res = await fetch(`${API_URL}/guided-study/sessions/${session.id}/resolve-doubt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parent_message_id: parentMessageId,
+          thread_id: threadId
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('Falha ao marcar dúvida como resolvida');
+      }
+
+      const updated: GuidedStudySession = await res.json();
+      set({ activeSession: updated });
+      return true;
+    } catch (err) {
+      console.error('Erro ao resolver dúvida:', err);
+      return false;
     }
   },
 

@@ -2820,6 +2820,67 @@ def generate_visual_for_study_message(
     return res
 
 
+@protected_router.post("/guided-study/sessions/{session_id}/raise-hand", response_model=schemas.GuidedStudySessionResponse)
+def raise_hand_for_study_doubt(
+    session_id: int,
+    payload: schemas.GuidedStudyRaiseHandRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    session = db.query(models.GuidedStudySession).filter(models.GuidedStudySession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Sessão de Estudo Guiado não encontrada.")
+
+    try:
+        guided_study_engine.process_raise_hand_doubt(
+            db=db,
+            session=session,
+            user_doubt=payload.doubt_text,
+            parent_message_id=payload.parent_message_id,
+            thread_id=payload.thread_id
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Erro ao processar dúvida de sala de aula (Levantar a Mão): {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Erro ao esclarecer dúvida com o professor.")
+
+    log_activity_event(
+        db,
+        request,
+        "GUIDED_STUDY_RAISE_HAND",
+        f"Dúvida levantada pelo aluno na sessão #{session_id} vinculada à mensagem {payload.parent_message_id}.",
+        category="STUDY",
+        severity="INFO",
+    )
+    return serialize_guided_study_session(session)
+
+
+@protected_router.post("/guided-study/sessions/{session_id}/resolve-doubt", response_model=schemas.GuidedStudySessionResponse)
+def resolve_study_doubt_thread(
+    session_id: int,
+    payload: schemas.GuidedStudyResolveDoubtRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    session = db.query(models.GuidedStudySession).filter(models.GuidedStudySession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Sessão de Estudo Guiado não encontrada.")
+
+    try:
+        guided_study_engine.resolve_raise_hand_doubt(
+            db=db,
+            session=session,
+            parent_message_id=payload.parent_message_id,
+            thread_id=payload.thread_id
+        )
+    except Exception as e:
+        logger.error(f"Erro ao marcar dúvida como resolvida: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Erro ao atualizar status da dúvida.")
+
+    return serialize_guided_study_session(session)
+
+
 app.include_router(protected_router)
 
 # 3. Domínio ISOLADO da Equipe: /team-auth, /team-portal (liderados) e /team-admin (somente Líder)

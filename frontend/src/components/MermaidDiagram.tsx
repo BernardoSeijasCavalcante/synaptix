@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { createPortal } from 'react-dom';
 import mermaid from 'mermaid';
 import { 
@@ -15,10 +15,19 @@ import {
   Sparkles
 } from 'lucide-react';
 
-interface MermaidDiagramProps {
+export interface MermaidDiagramHandle {
+  openModal: () => void;
+  closeModal: () => void;
+}
+
+export interface MermaidDiagramProps {
   chart: string;
   title?: string;
   onInsertIntoNote?: (code: string) => void;
+  variant?: 'card' | 'embedded';
+  height?: number | string;
+  zoom?: number;
+  className?: string;
 }
 
 // Configura o tema do Mermaid uma única vez com isolamento de erros
@@ -27,6 +36,17 @@ mermaid.initialize({
   suppressErrorRendering: true,
   theme: 'dark',
   securityLevel: 'loose',
+  flowchart: {
+    useMaxWidth: false,
+    htmlLabels: true,
+    curve: 'basis',
+  },
+  sequence: {
+    useMaxWidth: false,
+  },
+  gantt: {
+    useMaxWidth: false,
+  },
   themeVariables: {
     darkMode: true,
     background: 'transparent',
@@ -41,6 +61,7 @@ mermaid.initialize({
     clusterBkg: '#0f172a80',
     clusterBorder: '#64748b',
     defaultLinkColor: '#eab308',
+    fontSize: '15px',
     fontFamily: 'ui-sans-serif, system-ui, sans-serif',
   },
 });
@@ -48,6 +69,11 @@ mermaid.initialize({
 export function sanitizeMermaidCode(raw: string): string {
   let code = raw.trim().replace(/^```mermaid\s*/i, '').replace(/\s*```$/i, '').trim();
   if (!code) return '';
+
+  // 0. Filtra diretivas e comentários de dimensão do Synaptix para não interferir na compilação do Mermaid
+  const rawLines = code.split('\n');
+  const codeLines = rawLines.filter((line) => !/^%%\s*(?:synaptix|height|zoom)/i.test(line.trim()));
+  code = codeLines.join('\n');
 
   // 1. Decodifica entidades HTML que possam ter sido injetadas (&gt; -> >, &lt; -> <, &amp; -> &, &quot; -> ", &#39; -> ')
   code = code
@@ -84,7 +110,10 @@ export function sanitizeMermaidCode(raw: string): string {
   return sanitizedLines.join('\n');
 }
 
-export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, onInsertIntoNote }) => {
+export const MermaidDiagram = forwardRef<MermaidDiagramHandle, MermaidDiagramProps>((
+  { chart, title, onInsertIntoNote, variant = 'card', height, zoom = 1, className },
+  ref
+) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const modalCanvasRef = useRef<HTMLDivElement>(null);
 
@@ -94,12 +123,28 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
 
   // Estados do Modal Centralizado de Tela Cheia com Pan & Zoom
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [zoom, setZoom] = useState(1);
+  const [modalZoom, setModalZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
 
   const cleanChart = sanitizeMermaidCode(chart);
+
+  const handleOpenModal = useCallback(() => {
+    setModalZoom(1);
+    setPan({ x: 0, y: 0 });
+    setIsModalOpen(true);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setIsModalOpen(false);
+    setIsDragging(false);
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    openModal: handleOpenModal,
+    closeModal: handleCloseModal,
+  }), [handleOpenModal, handleCloseModal]);
 
   useEffect(() => {
     let isMounted = true;
@@ -116,7 +161,9 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
       .render(uniqueId, cleanChart)
       .then(({ svg }) => {
         if (isMounted) {
-          setSvgContent(svg);
+          // Remove max-width restritivo inline gerado pelo Mermaid para permitir expansão responsiva
+          const cleanSvg = svg.replace(/style="max-width:\s*[^"]*"/gi, '');
+          setSvgContent(cleanSvg);
           setRenderError(null);
         }
       })
@@ -143,19 +190,8 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleOpenModal = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = useCallback(() => {
-    setIsModalOpen(false);
-    setIsDragging(false);
-  }, []);
-
   const handleResetView = () => {
-    setZoom(1);
+    setModalZoom(1);
     setPan({ x: 0, y: 0 });
   };
 
@@ -177,9 +213,9 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
       if (e.key === 'Escape') {
         handleCloseModal();
       } else if (e.key === '+' || e.key === '=') {
-        setZoom((prev) => Math.min(Number((prev * 1.2).toFixed(2)), 5.0));
+        setModalZoom((prev) => Math.min(Number((prev * 1.2).toFixed(2)), 5.0));
       } else if (e.key === '-' || e.key === '_') {
-        setZoom((prev) => Math.max(Number((prev * 0.8).toFixed(2)), 0.25));
+        setModalZoom((prev) => Math.max(Number((prev * 0.8).toFixed(2)), 0.25));
       } else if (e.key === '0' || e.key.toLowerCase() === 'r') {
         handleResetView();
       }
@@ -190,7 +226,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
     };
   }, [isModalOpen, handleCloseModal]);
 
-  // Zoom suave com a roda do mouse (Wheel)
+  // Zoom suave com a roda do mouse (Wheel) no modal
   useEffect(() => {
     if (!isModalOpen) return;
     const canvas = modalCanvasRef.current;
@@ -199,7 +235,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
-      setZoom((prev) => Math.min(Math.max(Number((prev * zoomFactor).toFixed(2)), 0.25), 5.0));
+      setModalZoom((prev) => Math.min(Math.max(Number((prev * zoomFactor).toFixed(2)), 0.25), 5.0));
     };
 
     canvas.addEventListener('wheel', handleWheel, { passive: false });
@@ -208,7 +244,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
     };
   }, [isModalOpen]);
 
-  // Pan / Arrastar com o mouse
+  // Pan / Arrastar com o mouse no modal
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return; // Apenas clique com botão esquerdo
     setIsDragging(true);
@@ -242,72 +278,118 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
 
   return (
     <>
-      <div className="my-2.5 rounded-xl bg-slate-950/80 border border-white/10 overflow-hidden shadow-xl text-xs">
-        {/* Header toolbar */}
-        <div className="px-3 py-1.5 bg-slate-900/90 border-b border-white/10 flex items-center justify-between text-[11px] text-slate-400">
-          <span className="font-semibold text-slate-300 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            {title || 'Diagrama / Autômato Formal'}
-          </span>
-          <div className="flex items-center gap-1">
-            {onInsertIntoNote && (
-              <button
-                onClick={() => onInsertIntoNote(`\`\`\`mermaid\n${cleanChart}\n\`\`\`\n`)}
-                className="p-1 hover:text-slate-200 hover:bg-white/10 rounded transition"
-                title="Inserir diagrama na nota"
-              >
-                <FileDown size={12} className="text-amber-400" />
-              </button>
-            )}
-            <button
-              onClick={handleCopy}
-              className="p-1 hover:text-slate-200 hover:bg-white/10 rounded transition"
-              title="Copiar código Mermaid"
-            >
-              {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-            </button>
-            <button
-              onClick={handleOpenModal}
-              className="p-1 hover:text-slate-200 hover:bg-white/10 rounded transition"
-              title="Expandir diagrama em tela cheia com zoom e navegação"
-            >
-              <Maximize2 size={12} />
-            </button>
-          </div>
-        </div>
-
-        {/* Diagram Viewport no Sidebar Card */}
+      {variant === 'embedded' ? (
+        /* Modo Integrado / Embutido (para NodeView do Editor TipTap: sem cabeçalho redundante nem borda aninhada) */
         <div 
           onClick={handleOpenModal}
-          className="p-4 flex items-center justify-center overflow-x-auto min-h-[120px] cursor-pointer group/card relative"
-          title="Clique para abrir e explorar em tela cheia interativa"
+          style={{
+            height: typeof height === 'number' ? `${height}px` : height || undefined,
+            minHeight: height ? undefined : '360px',
+          }}
+          className={`w-full flex items-center justify-center overflow-auto relative p-4 cursor-pointer group/card transition-all duration-150 select-none ${className || ''}`}
+          title="Clique para abrir e explorar em tela cheia com Zoom e Pan"
         >
           {renderError ? (
-            <div className="text-rose-400 flex items-center gap-2 p-2 bg-rose-500/10 rounded-lg text-xs font-mono">
-              <AlertCircle size={14} className="shrink-0" />
-              <span>Código visual simplificado:</span>
-              <pre className="text-[10px] text-slate-300 overflow-x-auto">{chart}</pre>
+            <div className="text-rose-400 flex items-center gap-2 p-3 bg-rose-500/10 rounded-xl text-xs font-mono max-w-full overflow-x-auto">
+              <AlertCircle size={16} className="shrink-0" />
+              <div>
+                <span className="font-semibold block mb-1">Aviso na renderização visual:</span>
+                <pre className="text-[11px] text-slate-300 overflow-x-auto whitespace-pre-wrap">{cleanChart}</pre>
+              </div>
             </div>
           ) : svgContent ? (
             <>
               <div
                 ref={containerRef}
-                className="mermaid-svg-container max-w-full flex justify-center [&>svg]:max-w-full [&>svg]:h-auto transition-transform duration-200 group-hover/card:scale-[1.02]"
+                style={{
+                  transform: zoom && zoom !== 1 ? `scale(${zoom})` : undefined,
+                  transformOrigin: 'center center',
+                }}
+                className="mermaid-svg-container w-full h-full flex items-center justify-center [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:w-auto [&>svg]:h-auto transition-transform duration-200 group-hover/card:scale-[1.01]"
                 dangerouslySetInnerHTML={{ __html: svgContent }}
               />
-              <div className="absolute inset-0 bg-amber-500/0 group-hover/card:bg-amber-500/[0.04] flex items-end justify-center pb-2 opacity-0 group-hover/card:opacity-100 transition-opacity pointer-events-none">
+              <div className="absolute inset-0 bg-amber-500/0 group-hover/card:bg-amber-500/[0.03] flex items-end justify-center pb-2 opacity-0 group-hover/card:opacity-100 transition-opacity pointer-events-none">
                 <span className="px-2.5 py-1 rounded-full bg-slate-900/90 border border-amber-400/30 text-[10px] text-amber-300 font-medium shadow-lg flex items-center gap-1.5">
-                  <Maximize2 size={10} /> Clique para explorar com Zoom e Pan
+                  <Maximize2 size={10} /> Clique para explorar em tela cheia com Zoom e Pan
                 </span>
               </div>
             </>
           ) : (
-            <span className="text-slate-500 text-[11px]">Gerando representação visual...</span>
+            <span className="text-slate-500 text-xs flex items-center gap-2 py-8">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              Gerando diagrama visual...
+            </span>
           )}
         </div>
-      </div>
+      ) : (
+        /* Modo Card Tradicional (para GuidedStudySidebar / visualização independente com toolbar própria) */
+        <div className="my-2.5 rounded-xl bg-slate-950/80 border border-white/10 overflow-hidden shadow-xl text-xs">
+          {/* Header toolbar */}
+          <div className="px-3 py-1.5 bg-slate-900/90 border-b border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+            <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              {title || 'Diagrama / Autômato Formal'}
+            </span>
+            <div className="flex items-center gap-1">
+              {onInsertIntoNote && (
+                <button
+                  onClick={() => onInsertIntoNote(`\`\`\`mermaid\n${cleanChart}\n\`\`\`\n`)}
+                  className="p-1 hover:text-slate-200 hover:bg-white/10 rounded transition cursor-pointer"
+                  title="Inserir diagrama na nota"
+                >
+                  <FileDown size={12} className="text-amber-400" />
+                </button>
+              )}
+              <button
+                onClick={handleCopy}
+                className="p-1 hover:text-slate-200 hover:bg-white/10 rounded transition cursor-pointer"
+                title="Copiar código Mermaid"
+              >
+                {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+              </button>
+              <button
+                onClick={handleOpenModal}
+                className="p-1 hover:text-slate-200 hover:bg-white/10 rounded transition cursor-pointer"
+                title="Expandir diagrama em tela cheia com zoom e navegação"
+              >
+                <Maximize2 size={12} />
+              </button>
+            </div>
+          </div>
 
-      {/* Modal Centralizado via React Portal no document.body (Completamente Desvinculado do Sidebar) */}
+          {/* Diagram Viewport no Sidebar Card */}
+          <div 
+            onClick={handleOpenModal}
+            className="p-4 flex items-center justify-center overflow-x-auto min-h-[140px] cursor-pointer group/card relative"
+            title="Clique para abrir e explorar em tela cheia interativa"
+          >
+            {renderError ? (
+              <div className="text-rose-400 flex items-center gap-2 p-2 bg-rose-500/10 rounded-lg text-xs font-mono">
+                <AlertCircle size={14} className="shrink-0" />
+                <span>Código visual simplificado:</span>
+                <pre className="text-[10px] text-slate-300 overflow-x-auto">{chart}</pre>
+              </div>
+            ) : svgContent ? (
+              <>
+                <div
+                  ref={containerRef}
+                  className="mermaid-svg-container max-w-full flex justify-center [&>svg]:max-w-full [&>svg]:h-auto transition-transform duration-200 group-hover/card:scale-[1.02]"
+                  dangerouslySetInnerHTML={{ __html: svgContent }}
+                />
+                <div className="absolute inset-0 bg-amber-500/0 group-hover/card:bg-amber-500/[0.04] flex items-end justify-center pb-2 opacity-0 group-hover/card:opacity-100 transition-opacity pointer-events-none">
+                  <span className="px-2.5 py-1 rounded-full bg-slate-900/90 border border-amber-400/30 text-[10px] text-amber-300 font-medium shadow-lg flex items-center gap-1.5">
+                    <Maximize2 size={10} /> Clique para explorar com Zoom e Pan
+                  </span>
+                </div>
+              </>
+            ) : (
+              <span className="text-slate-500 text-[11px]">Gerando representação visual...</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Centralizado via React Portal no document.body */}
       {isModalOpen && typeof document !== 'undefined' && createPortal(
         <div 
           className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 md:p-8 animate-in fade-in duration-200"
@@ -333,29 +415,29 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
               {/* Controles de Zoom, Navegação e Ações */}
               <div className="flex items-center gap-1.5 bg-slate-950/70 p-1 rounded-xl border border-white/10">
                 <button
-                  onClick={() => setZoom((prev) => Math.max(Number((prev * 0.8).toFixed(2)), 0.25))}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/10 transition"
+                  onClick={() => setModalZoom((prev) => Math.max(Number((prev * 0.8).toFixed(2)), 0.25))}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/10 transition cursor-pointer"
                   title="Diminuir Zoom (-)"
                 >
                   <ZoomOut size={16} />
                 </button>
                 <button
                   onClick={handleResetView}
-                  className="px-2.5 py-1 rounded-md text-xs font-mono font-bold text-amber-300 hover:bg-amber-400/10 transition"
+                  className="px-2.5 py-1 rounded-md text-xs font-mono font-bold text-amber-300 hover:bg-amber-400/10 transition cursor-pointer"
                   title="Resetar Zoom (100%)"
                 >
-                  {Math.round(zoom * 100)}%
+                  {Math.round(modalZoom * 100)}%
                 </button>
                 <button
-                  onClick={() => setZoom((prev) => Math.min(Number((prev * 1.2).toFixed(2)), 5.0))}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/10 transition"
+                  onClick={() => setModalZoom((prev) => Math.min(Number((prev * 1.2).toFixed(2)), 5.0))}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/10 transition cursor-pointer"
                   title="Aumentar Zoom (+)"
                 >
                   <ZoomIn size={16} />
                 </button>
                 <button
                   onClick={handleResetView}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/10 transition"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/10 transition cursor-pointer"
                   title="Centralizar e Resetar Visão (R / 0)"
                 >
                   <RotateCcw size={16} />
@@ -366,7 +448,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
                 {onInsertIntoNote && (
                   <button
                     onClick={() => onInsertIntoNote(`\`\`\`mermaid\n${cleanChart}\n\`\`\`\n`)}
-                    className="p-1.5 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 transition"
+                    className="p-1.5 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 transition cursor-pointer"
                     title="Inserir diagrama na nota"
                   >
                     <FileDown size={16} />
@@ -375,7 +457,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
 
                 <button
                   onClick={handleCopy}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/10 transition"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/10 transition cursor-pointer"
                   title="Copiar código Mermaid"
                 >
                   {copied ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
@@ -385,7 +467,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
 
                 <button
                   onClick={handleCloseModal}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
                   title="Fechar modal (Esc)"
                 >
                   <X size={18} />
@@ -409,7 +491,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
               {svgContent ? (
                 <div
                   style={{
-                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${modalZoom})`,
                     transformOrigin: 'center center',
                     transition: isDragging ? 'none' : 'transform 0.08s ease-out',
                   }}
@@ -427,11 +509,11 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
                   Clique e arraste para navegar
                 </span>
                 <span className="w-1 h-1 rounded-full bg-slate-600" />
-                <span>Role o mouse para zoom ({Math.round(zoom * 100)}%)</span>
+                <span>Role o mouse para zoom ({Math.round(modalZoom * 100)}%)</span>
                 <span className="w-1 h-1 rounded-full bg-slate-600" />
                 <button
                   onClick={handleResetView}
-                  className="text-amber-400 hover:text-amber-300 hover:underline font-semibold"
+                  className="text-amber-400 hover:text-amber-300 hover:underline font-semibold cursor-pointer"
                 >
                   Resetar visão
                 </button>
@@ -443,4 +525,4 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, title, on
       )}
     </>
   );
-};
+});

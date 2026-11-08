@@ -558,6 +558,26 @@ class GuidedStudyTopicItem(BaseModel):
     subconcepts: List[GuidedStudySubconceptItem] = []
     source_refs: List[dict] = []
 
+class GuidedStudyDoubtMessage(BaseModel):
+    id: str
+    role: str  # user, assistant
+    content: str
+    slide_reference: Optional[GuidedStudySlideReference] = None
+    covered_pages: List[int] = []
+    diagram_mermaid: Optional[str] = None
+    timestamp: str
+
+class GuidedStudyDoubtThread(BaseModel):
+    id: str
+    parent_message_id: str
+    topic_id: Optional[str] = None
+    subconcept_id: Optional[str] = None
+    title: str
+    status: str = "open"  # open, resolved
+    messages: List[GuidedStudyDoubtMessage] = []
+    created_at: str
+    updated_at: str
+
 class GuidedStudyMessageItem(BaseModel):
     id: str
     role: str  # assistant, user
@@ -579,6 +599,7 @@ class GuidedStudyMessageItem(BaseModel):
     topic_validated: Optional[bool] = False
     chapter_surface_completed: Optional[bool] = False
     synapse_comment_id: Optional[int] = None
+    doubt_threads: List[GuidedStudyDoubtThread] = []
     timestamp: str
 
 class GuidedStudySourceMeta(BaseModel):
@@ -628,6 +649,15 @@ class CrystallizeSynapseRequest(BaseModel):
 class GenerateVisualRequest(BaseModel):
     message_id: str
     prompt_hint: Optional[str] = None
+
+class GuidedStudyRaiseHandRequest(BaseModel):
+    parent_message_id: str
+    doubt_text: str = Field(..., min_length=1)
+    thread_id: Optional[str] = None
+
+class GuidedStudyResolveDoubtRequest(BaseModel):
+    parent_message_id: str
+    thread_id: str
 
 class ExtractFileResponse(BaseModel):
     filename: str

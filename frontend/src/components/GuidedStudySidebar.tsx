@@ -5,7 +5,7 @@ import {
   FileText, Upload, Trash2, Brain, FileDown, 
   Maximize2, Minimize2, Compass, Layers, Check, AlertCircle,
   ExternalLink, Palette, RotateCw, CheckSquare, Square, BookOpen,
-  FastForward
+  FastForward, Hand, CheckCheck, HelpCircle
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -15,7 +15,7 @@ import 'katex/dist/katex.min.css';
 
 import { useGuidedStudyStore } from '../store/useGuidedStudyStore';
 import { useNotesStore } from '../store/useNotesStore';
-import type { GuidedStudyMessage } from '../types';
+import type { GuidedStudyMessage, GuidedStudyDoubtThread } from '../types';
 import { MermaidDiagram, sanitizeMermaidCode } from './MermaidDiagram';
 
 interface GuidedStudySidebarProps {
@@ -32,7 +32,8 @@ export const GuidedStudySidebar: React.FC<GuidedStudySidebarProps> = ({
     isLoadingSessions, isInitializingSession, isSendingTurn, 
     isExtractingFile, error, fetchSessions, loadSession, 
     createSession, sendTurn, extractFile, crystallizeSynapse, 
-    deleteSession, clearActiveSession, rebuildRoadmap, jumpToStep, generateVisual
+    deleteSession, clearActiveSession, rebuildRoadmap, jumpToStep, generateVisual,
+    raiseHand, resolveDoubt, isAskingDoubt, raisingHandForMessageId
   } = useGuidedStudyStore();
 
   const { activeWorkspaceId, activeNotebookId, activeNoteId, notes } = useNotesStore();
@@ -54,6 +55,12 @@ export const GuidedStudySidebar: React.FC<GuidedStudySidebarProps> = ({
   const [isExpandedWidth, setIsExpandedWidth] = useState(false);
   const [insertedMessageIds, setInsertedMessageIds] = useState<Record<string, boolean>>({});
   const [generatingVisualForMsgId, setGeneratingVisualForMsgId] = useState<string | null>(null);
+
+  // Levantar a mão / Dúvidas de Sala de Aula state
+  const [openDoubtDrawerMsgId, setOpenDoubtDrawerMsgId] = useState<string | null>(null);
+  const [newDoubtInputByMsgId, setNewDoubtInputByMsgId] = useState<Record<string, string>>({});
+  const [threadReplyInputs, setThreadReplyInputs] = useState<Record<string, string>>({});
+  const [insertedThreadIds, setInsertedThreadIds] = useState<Record<string, boolean>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -190,6 +197,68 @@ export const GuidedStudySidebar: React.FC<GuidedStudySidebarProps> = ({
     setGeneratingVisualForMsgId(messageId);
     await generateVisual(activeSession.id, messageId);
     setGeneratingVisualForMsgId(null);
+  };
+
+  const handleInsertDoubtSnippet = (thread: GuidedStudyDoubtThread) => {
+    if (!onInsertIntoNote) return;
+
+    const firstUserMsg = thread.messages.find((m) => m.role === 'user');
+    const teacherMsgs = thread.messages.filter((m) => m.role === 'assistant');
+    const lastTeacherMsg = teacherMsgs[teacherMsgs.length - 1];
+
+    const questionText = firstUserMsg?.content || thread.title || 'Dúvida';
+    const answerText = lastTeacherMsg?.content || 'Explicação do professor';
+    const slideRef = lastTeacherMsg?.slide_reference || firstUserMsg?.slide_reference;
+
+    let snippet = `\n\n> 💡 **Dúvida de Sala de Aula:** *"${questionText.trim()}"*\n`;
+    if (slideRef) {
+      snippet += `> *Referência:* ${slideRef.source_title || 'Material'}${slideRef.page_number ? ` (Pág. ${slideRef.page_number})` : ''}\n`;
+    }
+    snippet += `>\n`;
+    
+    for (const line of answerText.split('\n')) {
+      snippet += `> ${line}\n`;
+    }
+
+    if (lastTeacherMsg?.diagram_mermaid) {
+      const cleanMermaid = sanitizeMermaidCode(lastTeacherMsg.diagram_mermaid);
+      snippet += `\n\`\`\`mermaid\n${cleanMermaid}\n\`\`\`\n`;
+    }
+    snippet += `\n`;
+
+    onInsertIntoNote(snippet);
+    setInsertedThreadIds((prev) => ({ ...prev, [thread.id]: true }));
+  };
+
+  const handleSendRaiseHand = async (parentMsgId: string, threadId?: string) => {
+    const text = threadId ? threadReplyInputs[threadId]?.trim() : newDoubtInputByMsgId[parentMsgId]?.trim();
+    if (!text) return;
+
+    if (threadId) {
+      setThreadReplyInputs((prev) => ({ ...prev, [threadId]: '' }));
+    } else {
+      setNewDoubtInputByMsgId((prev) => ({ ...prev, [parentMsgId]: '' }));
+    }
+
+    await raiseHand(parentMsgId, text, threadId);
+  };
+
+  const handleResolveDoubtThread = async (parentMsgId: string, threadId: string) => {
+    await resolveDoubt(parentMsgId, threadId);
+  };
+
+  const handleRaiseHandBottomClick = () => {
+    const assistantMsgs = activeSession?.messages?.filter((m) => m.role === 'assistant') || [];
+    if (assistantMsgs.length === 0) return;
+    const lastAssistant = assistantMsgs[assistantMsgs.length - 1];
+    setOpenDoubtDrawerMsgId(lastAssistant.id);
+
+    setTimeout(() => {
+      const el = document.getElementById(`msg-${lastAssistant.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 50);
   };
 
   if (!isOpen) return null;
@@ -943,11 +1012,15 @@ export const GuidedStudySidebar: React.FC<GuidedStudySidebarProps> = ({
             {activeSession.messages.map((msg, index) => {
               const isAssistant = msg.role === 'assistant';
               const isInserted = Boolean(insertedMessageIds[msg.id]);
+              const hasDoubtThreads = Boolean(msg.doubt_threads && msg.doubt_threads.length > 0);
+              const isDoubtDrawerOpen = openDoubtDrawerMsgId === msg.id;
 
               return (
-                <div key={msg.id || index} className={`space-y-2 ${isAssistant ? '' : 'flex justify-end'}`}>
+                <div key={msg.id || index} id={`msg-${msg.id}`} className={`space-y-2 ${isAssistant ? '' : 'flex justify-end'}`}>
                   {isAssistant ? (
-                    <div className="glass-card p-4 rounded-2xl border border-white/10 space-y-3 relative group shadow-lg">
+                    <div className={`glass-card p-4 rounded-2xl border transition-all duration-200 space-y-3 relative group shadow-lg ${
+                      isDoubtDrawerOpen ? 'border-sky-500/40 shadow-[0_0_20px_rgba(14,165,233,0.12)]' : 'border-white/10'
+                    }`}>
                       {/* Slide Reference Banner with Quick Navigation */}
                       {msg.slide_reference && (
                         <div className="flex items-center justify-between p-2 rounded-xl bg-purple-950/40 border border-purple-500/30 text-[11px] text-purple-200">
@@ -1083,6 +1156,24 @@ export const GuidedStudySidebar: React.FC<GuidedStudySidebarProps> = ({
                         </span>
 
                         <div className="flex items-center gap-2">
+                          {/* Levantar a Mão / Dúvidas de Sala de Aula */}
+                          <button
+                            type="button"
+                            onClick={() => setOpenDoubtDrawerMsgId(isDoubtDrawerOpen ? null : msg.id)}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-lg transition font-medium text-[10px] ${
+                              hasDoubtThreads
+                                ? 'bg-sky-500/20 text-sky-200 border border-sky-500/40 hover:bg-sky-500/30 shadow-[0_0_10px_rgba(14,165,233,0.15)]'
+                                : isDoubtDrawerOpen
+                                ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30'
+                                : 'hover:bg-sky-500/10 text-slate-300 hover:text-sky-300 border border-transparent'
+                            }`}
+                            title="Tirar dúvida pontual com o professor sem avançar o conteúdo"
+                          >
+                            <Hand size={11} className={hasDoubtThreads ? 'text-sky-400' : 'text-slate-400'} />
+                            <span>{hasDoubtThreads ? `Dúvidas (${msg.doubt_threads!.length})` : 'Levantar a Mão'}</span>
+                            {isDoubtDrawerOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                          </button>
+
                           {/* Generate Visual Diagram on Demand */}
                           {!msg.diagram_mermaid && (
                             <button
@@ -1134,6 +1225,229 @@ export const GuidedStudySidebar: React.FC<GuidedStudySidebarProps> = ({
                           </button>
                         </div>
                       </div>
+
+                      {/* Option A: Expandable Accordion Drawer for Classroom Doubts */}
+                      {isDoubtDrawerOpen && (
+                        <div className="mt-3 pt-3 border-t border-sky-500/30 bg-gradient-to-b from-sky-950/40 via-slate-900/90 to-slate-950/95 -mx-4 -mb-4 p-4 rounded-b-2xl space-y-3 animate-in fade-in duration-200">
+                          <div className="flex items-center justify-between border-b border-sky-500/20 pb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="p-1.5 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                                <Hand size={13} className="text-sky-400" />
+                              </div>
+                              <div>
+                                <h4 className="text-xs font-bold text-sky-200 flex items-center gap-1.5">
+                                  Dúvidas de Sala de Aula
+                                </h4>
+                                <p className="text-[10px] text-sky-300/70">
+                                  Discussão pontual e direta • Não consome tentativas nem avança a trilha
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setOpenDoubtDrawerMsgId(null)}
+                              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition text-xs"
+                              title="Recolher gaveta de dúvidas"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+
+                          {/* Existing doubt threads */}
+                          {msg.doubt_threads && msg.doubt_threads.length > 0 ? (
+                            <div className="space-y-3">
+                              {msg.doubt_threads.map((thread) => {
+                                const isResolved = thread.status === 'resolved';
+                                const isThreadInserted = Boolean(insertedThreadIds[thread.id]);
+                                const isReplyingThisThread = isAskingDoubt && raisingHandForMessageId === msg.id;
+
+                                return (
+                                  <div
+                                    key={thread.id}
+                                    className={`p-3 rounded-xl border space-y-2.5 transition ${
+                                      isResolved
+                                        ? 'bg-slate-900/60 border-slate-700/50'
+                                        : 'bg-sky-950/30 border-sky-500/30 shadow-md'
+                                    }`}
+                                  >
+                                    {/* Thread Header */}
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-semibold border shrink-0 flex items-center gap-1 ${
+                                          isResolved
+                                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                            : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                                        }`}>
+                                          {isResolved ? <CheckCircle2 size={10} /> : <HelpCircle size={10} />}
+                                          {isResolved ? 'Resolvida' : 'Em Discussão'}
+                                        </span>
+                                        <span className="text-[11px] font-semibold text-slate-200 truncate" title={thread.title}>
+                                          {thread.title}
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        {/* Insert doubt into note button */}
+                                        {onInsertIntoNote && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleInsertDoubtSnippet(thread)}
+                                            className={`px-2 py-1 rounded-lg text-[10px] font-medium flex items-center gap-1 transition ${
+                                              isThreadInserted
+                                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                                : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-amber-300 border border-white/10'
+                                            }`}
+                                            title="Inserir esta dúvida e explicação na sua nota de anotações"
+                                          >
+                                            {isThreadInserted ? <Check size={10} /> : <FileDown size={10} className="text-amber-400" />}
+                                            <span>{isThreadInserted ? 'Inserido' : 'Inserir na Nota'}</span>
+                                          </button>
+                                        )}
+
+                                        {/* Mark as resolved button */}
+                                        {!isResolved && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleResolveDoubtThread(msg.id, thread.id)}
+                                            className="px-2 py-1 rounded-lg text-[10px] font-medium bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/30 flex items-center gap-1 transition"
+                                            title="Marcar dúvida como esclarecida"
+                                          >
+                                            <CheckCheck size={10} className="text-emerald-400" />
+                                            <span>Esclarecida</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Thread Messages */}
+                                    <div className="space-y-2 pt-1 border-t border-white/5">
+                                      {thread.messages.map((dmsg, dIdx) => {
+                                        const isDoubtAssistant = dmsg.role === 'assistant';
+                                        return (
+                                          <div
+                                            key={dmsg.id || dIdx}
+                                            className={`p-2.5 rounded-xl text-[11px] leading-relaxed ${
+                                              isDoubtAssistant
+                                                ? 'bg-slate-900/90 border border-slate-700/60 text-slate-200'
+                                                : 'bg-sky-500/15 border border-sky-400/30 text-sky-100 ml-3'
+                                            }`}
+                                          >
+                                            <div className="flex items-center justify-between mb-1 text-[9px] text-slate-400 font-mono">
+                                              <span className="font-semibold text-sky-300">
+                                                {isDoubtAssistant ? '👨‍🏫 Professor (Explicação Direta)' : '🙋‍♂️ Sua Dúvida'}
+                                              </span>
+                                              <span>{new Date(dmsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            </div>
+
+                                            {/* Content with Page Chips & Math */}
+                                            <div className="prose prose-invert max-w-none text-[11px]">
+                                              {renderMarkdownWithPageChips(dmsg.content, msg)}
+                                            </div>
+
+                                            {/* Mermaid diagram if generated in doubt response */}
+                                            {dmsg.diagram_mermaid && (
+                                              <div className="mt-2">
+                                                <MermaidDiagram
+                                                  chart={dmsg.diagram_mermaid}
+                                                  title="Diagrama Ilustrativo da Dúvida"
+                                                  onInsertIntoNote={onInsertIntoNote}
+                                                />
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+
+                                    {/* Follow-up input for active thread */}
+                                    {!isResolved && (
+                                      <div className="pt-2 border-t border-white/5 flex items-end gap-1.5">
+                                        <textarea
+                                          rows={1}
+                                          value={threadReplyInputs[thread.id] || ''}
+                                          onChange={(e) => setThreadReplyInputs((prev) => ({ ...prev, [thread.id]: e.target.value }))}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                              e.preventDefault();
+                                              handleSendRaiseHand(msg.id, thread.id);
+                                            }
+                                          }}
+                                          placeholder="Fazer réplica ou perguntar mais detalhes..."
+                                          disabled={isReplyingThisThread}
+                                          className="flex-1 glass-input text-xs text-slate-100 p-2 rounded-lg resize-none focus:ring-1 focus:ring-sky-400/50 bg-slate-950/70 border-sky-500/20 text-[11px]"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSendRaiseHand(msg.id, thread.id)}
+                                          disabled={isReplyingThisThread || !threadReplyInputs[thread.id]?.trim()}
+                                          className="px-2.5 py-2 rounded-lg bg-sky-500/30 hover:bg-sky-500/40 text-sky-200 border border-sky-500/40 text-[11px] font-medium transition disabled:opacity-40 shrink-0 flex items-center gap-1"
+                                          title="Enviar réplica"
+                                        >
+                                          {isReplyingThisThread ? (
+                                            <Loader2 size={12} className="animate-spin" />
+                                          ) : (
+                                            <Send size={12} />
+                                          )}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="p-3 rounded-xl bg-sky-950/20 border border-sky-500/20 text-center text-xs text-slate-400">
+                              Nenhuma dúvida levantada para este bloco ainda. Digite sua pergunta abaixo.
+                            </div>
+                          )}
+
+                          {/* Live Loading Feedback while asking doubt */}
+                          {isAskingDoubt && raisingHandForMessageId === msg.id && (
+                            <div className="p-3 rounded-xl bg-sky-950/40 border border-sky-400/30 flex items-center gap-2 text-xs text-sky-200 animate-pulse">
+                              <Loader2 size={14} className="animate-spin text-sky-400 shrink-0" />
+                              <span>O professor está consultando os slides e preparando a explicação da sua dúvida...</span>
+                            </div>
+                          )}
+
+                          {/* Form to raise a new doubt */}
+                          <div className="p-3 rounded-xl bg-slate-900/80 border border-sky-500/30 space-y-2">
+                            <span className="text-[10px] font-bold text-sky-300 uppercase tracking-wider flex items-center gap-1.5">
+                              <Lightbulb size={11} className="text-amber-400" />
+                              Nova Dúvida Pontual sobre esta Explicação
+                            </span>
+                            <div className="flex items-end gap-2">
+                              <textarea
+                                rows={2}
+                                value={newDoubtInputByMsgId[msg.id] || ''}
+                                onChange={(e) => setNewDoubtInputByMsgId((prev) => ({ ...prev, [msg.id]: e.target.value }))}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSendRaiseHand(msg.id);
+                                  }
+                                }}
+                                placeholder="Ex: Professor, não entendi como esse fecho se aplica ao slide. Poderia me dar um exemplo direto?"
+                                disabled={isAskingDoubt && raisingHandForMessageId === msg.id}
+                                className="flex-1 glass-input text-xs text-slate-100 p-2.5 rounded-xl resize-none focus:ring-1 focus:ring-sky-400/50 bg-slate-950/90 border-sky-500/30 text-[11px]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSendRaiseHand(msg.id)}
+                                disabled={(isAskingDoubt && raisingHandForMessageId === msg.id) || !newDoubtInputByMsgId[msg.id]?.trim()}
+                                className="px-3 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-medium text-xs shadow-lg disabled:opacity-40 transition-transform hover:scale-105 active:scale-95 shrink-0 flex items-center gap-1.5"
+                                title="Perguntar ao professor (Enter)"
+                              >
+                                {isAskingDoubt && raisingHandForMessageId === msg.id ? (
+                                  <Loader2 size={13} className="animate-spin" />
+                                ) : (
+                                  <Send size={13} />
+                                )}
+                                <span>Perguntar</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     /* Student User Message */
@@ -1210,6 +1524,17 @@ export const GuidedStudySidebar: React.FC<GuidedStudySidebarProps> = ({
           <div className="p-3 border-t border-white/10 bg-slate-900/60 shrink-0 space-y-2">
             <div className="flex items-center justify-between text-[11px] text-slate-400">
               <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleRaiseHandBottomClick}
+                  disabled={isSendingTurn || isAskingDoubt}
+                  className="hover:text-sky-300 flex items-center gap-1 text-[11px] transition disabled:opacity-50 text-sky-400 font-medium cursor-pointer"
+                  title="Levantar a mão para tirar dúvida pontual sobre a explicação atual sem avançar a trilha"
+                >
+                  <Hand size={12} className="text-sky-400" />
+                  <span>Levantar a Mão</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => handleSendResponse('ask_hint')}

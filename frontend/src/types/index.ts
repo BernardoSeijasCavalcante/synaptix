@@ -93,6 +93,28 @@ export interface GuidedStudyTopic {
   chapter_surface_completed?: boolean;
 }
 
+export interface GuidedStudyDoubtMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  slide_reference?: GuidedStudySlideReference | null;
+  covered_pages?: number[];
+  diagram_mermaid?: string | null;
+  timestamp: string;
+}
+
+export interface GuidedStudyDoubtThread {
+  id: string;
+  parent_message_id: string;
+  topic_id?: string | null;
+  subconcept_id?: string | null;
+  title: string;
+  status: 'open' | 'resolved';
+  messages: GuidedStudyDoubtMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface GuidedStudyMessage {
   id: string;
   role: 'assistant' | 'user';
@@ -113,6 +135,7 @@ export interface GuidedStudyMessage {
   student_synthesis?: string | null;
   topic_validated?: boolean;
   synapse_comment_id?: number | null;
+  doubt_threads?: GuidedStudyDoubtThread[];
   timestamp: string;
 }
 

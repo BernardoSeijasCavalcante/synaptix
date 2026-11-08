@@ -576,6 +576,44 @@ def generate_initial_roadmap_and_first_question(
     }
 
 
+def answer_extracted_doubt_directly(
+    session: models.GuidedStudySession,
+    topic: Optional[Dict[str, Any]],
+    subconcept: Optional[Dict[str, Any]],
+    doubt_text: str
+) -> str:
+    """
+    Responde diretamente a uma dúvida secundária detectada na mesma mensagem de resposta do aluno.
+    """
+    source_material_text = session.source_material_text or ""
+    pages_text = retrieve_relevant_source_pages(
+        source_material_text=source_material_text,
+        current_topic=topic or {},
+        current_subconcept=subconcept,
+        max_chars=20000
+    )
+    prompt = f"""Você é o Professor Especialista do Synaptix. O aluno respondeu corretamente à pergunta socrática, mas também expressou esta dúvida pontual:
+"{doubt_text}"
+
+PÁGINAS DOS SLIDES PARA EMBASAR:
+\"\"\"
+{pages_text}
+\"\"\"
+
+Esclareça a dúvida do aluno de forma 100% DIRETA, didática, amigável e em 2 a 4 frases, citando [Pág. X] se cabível. Sem perguntas de teste."""
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "system", "content": prompt}],
+            temperature=0.2,
+        )
+        return (resp.choices[0].message.content or "").strip()
+    except Exception as e:
+        logger.error(f"Erro ao responder dúvida extraída: {e}")
+        return "Sua dúvida foi registrada com atenção pelo professor."
+
+
 def process_study_turn(
     session: models.GuidedStudySession,
     user_message: str,
@@ -639,6 +677,7 @@ DIRETRIZES DE AVALIAÇÃO:
    - `true` se `mastered_subconcept`.
    - `false` se `doubt_or_question`.
    - Se `incomplete_or_incorrect` na fase de SUPERFÍCIE e `attempts >= 2`: marque `true` para AUTO-CONSOLIDAR e destravar o aluno, fornecendo a síntese completa!
+5. `extracted_doubt`: Se o estudante fez alguma pergunta ou expressou dúvida adicional (por exemplo: "Mas eu tenho uma dúvida...", "O que significa X?", "Por que isso acontece?"), extraia a dúvida pontual aqui. Se não houver dúvida, retorne null.
 
 Retorne RIGOROSAMENTE um JSON:
 {{
@@ -646,7 +685,8 @@ Retorne RIGOROSAMENTE um JSON:
   "subconcept_validated": true ou false,
   "what_was_right": "O que o aluno acertou...",
   "what_is_missing": "O que ainda faltava...",
-  "student_synthesis": "Síntese brilhante em 1-2 frases do conceito validado (ou null se for dúvida)"
+  "student_synthesis": "Síntese brilhante em 1-2 frases do conceito validado (ou null se for dúvida)",
+  "extracted_doubt": "Dúvida pontual adicional do aluno ou null"
 }}"""
 
     if action == "skip_block":
@@ -671,6 +711,7 @@ Retorne RIGOROSAMENTE um JSON:
     what_was_right = eval_result.get("what_was_right")
     what_is_missing = eval_result.get("what_is_missing")
     student_synthesis = eval_result.get("student_synthesis")
+    extracted_doubt = eval_result.get("extracted_doubt")
 
     # Registro da mensagem do usuário
     now_iso = datetime.utcnow().isoformat()
@@ -691,9 +732,52 @@ Retorne RIGOROSAMENTE um JSON:
     chapter_surface_completed = False
     advance_to_next_topic = False
     created_synapse_id = None
+    doubt_prefix = ""
 
     # MÁQUINA DE ESTADOS:
     if subconcept_validated:
+        # Se houve dúvida mista na mesma resposta correta, esclarece diretamente sem ignorar
+        if extracted_doubt:
+            direct_answer = answer_extracted_doubt_directly(
+                session=session,
+                topic=current_topic,
+                subconcept=current_subconcept,
+                doubt_text=extracted_doubt
+            )
+            doubt_prefix = f"💡 **Sobre a sua dúvida ('{extracted_doubt}'):**\n{direct_answer}\n\n"
+
+            if last_assistant_msg:
+                if "doubt_threads" not in last_assistant_msg or not isinstance(last_assistant_msg["doubt_threads"], list):
+                    last_assistant_msg["doubt_threads"] = []
+                auto_thread = {
+                    "id": f"thread-{uuid.uuid4().hex[:8]}",
+                    "parent_message_id": last_assistant_msg.get("id", "msg-init"),
+                    "topic_id": current_topic.get("id"),
+                    "subconcept_id": current_subconcept.get("id") if current_subconcept else None,
+                    "title": f"Dúvida: {extracted_doubt[:35]}...",
+                    "status": "resolved",
+                    "messages": [
+                        {
+                            "id": f"dmsg-{uuid.uuid4().hex[:8]}",
+                            "role": "user",
+                            "content": extracted_doubt,
+                            "timestamp": now_iso
+                        },
+                        {
+                            "id": f"dmsg-{uuid.uuid4().hex[:8]}",
+                            "role": "assistant",
+                            "content": direct_answer,
+                            "slide_reference": last_assistant_msg.get("slide_reference"),
+                            "covered_pages": last_assistant_msg.get("covered_pages", []),
+                            "diagram_mermaid": None,
+                            "timestamp": datetime.utcnow().isoformat()
+                        }
+                    ],
+                    "created_at": now_iso,
+                    "updated_at": datetime.utcnow().isoformat()
+                }
+                last_assistant_msg["doubt_threads"].append(auto_thread)
+
         # 1. Marcar subconceito como passado
         if current_subconcept:
             if current_phase == "surface":
@@ -723,7 +807,7 @@ Retorne RIGOROSAMENTE um JSON:
             current_topic["current_subconcept_index"] = sub_idx + 1
             target_topic = current_topic
             target_subconcept = subconcepts[current_topic["current_subconcept_index"]]
-            contextual_intro = f"✅ Excelente raciocínio: {what_was_right or student_synthesis}. Avançamos agora para o próximo bloco de páginas da matéria."
+            contextual_intro = f"{doubt_prefix}✅ Excelente raciocínio: {what_was_right or student_synthesis}. Avançamos agora para o próximo bloco de páginas da matéria."
         else:
             # 100% dos blocos deste tópico foram concluídos!
             topic_validated = True
@@ -742,7 +826,7 @@ Retorne RIGOROSAMENTE um JSON:
                 else:
                     target_topic["depth_status"] = "in_progress"
                 target_subconcept = target_topic["subconcepts"][0] if target_topic.get("subconcepts") else None
-                contextual_intro = f"🎉 Parabéns! Você concluiu a etapa de {current_topic.get('title')} ({'Superfície' if current_phase == 'surface' else 'Profundeza'}). Passamos agora para o Módulo {session.current_topic_index + 1}: {target_topic.get('title')}."
+                contextual_intro = f"{doubt_prefix}🎉 Parabéns! Você concluiu a etapa de {current_topic.get('title')} ({'Superfície' if current_phase == 'surface' else 'Profundeza'}). Passamos agora para o Módulo {session.current_topic_index + 1}: {target_topic.get('title')}."
             else:
                 # Fim da fase atual
                 if current_phase == "surface":
@@ -755,13 +839,13 @@ Retorne RIGOROSAMENTE um JSON:
                     roadmap[0]["depth_status"] = "in_progress"
                     target_topic = roadmap[0]
                     target_subconcept = target_topic["subconcepts"][0] if target_topic.get("subconcepts") else None
-                    contextual_intro = f"🏆 Conclusão da Base de Superfície! Todos os módulos foram compreendidos. Desbloqueamos agora a Fase de Profundeza sob o rigor de {session.depth_persona}."
+                    contextual_intro = f"{doubt_prefix}🏆 Conclusão da Base de Superfície! Todos os módulos foram compreendidos. Desbloqueamos agora a Fase de Profundeza sob o rigor de {session.depth_persona}."
                 else:
                     session.status = "completed"
                     session.current_phase = "completed"
                     target_topic = current_topic
                     target_subconcept = current_subconcept
-                    contextual_intro = f"🎓 Sessão Concluída! Você dominou tanto a Superfície quanto a Profundeza. A Grande Sacada está plenamente assimilada: '{session.big_insight}'."
+                    contextual_intro = f"{doubt_prefix}🎓 Sessão Concluída! Você dominou tanto a Superfície quanto a Profundeza. A Grande Sacada está plenamente assimilada: '{session.big_insight}'."
 
         # Gerar a aula completa do NOVO bloco
         if target_topic and target_subconcept and session.status != "completed":
@@ -1105,6 +1189,226 @@ Retorne SOMENTE o código Mermaid puro sem blocos ```mermaid de marcação."""
         "message_id": message_id,
         "diagram_mermaid": mermaid_code
     }
+
+
+def process_raise_hand_doubt(
+    db: Session,
+    session: models.GuidedStudySession,
+    user_doubt: str,
+    parent_message_id: str,
+    thread_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Processa uma dúvida do estudante através do recurso 'Levantar a Mão' (✋) em sala de aula:
+    - Postura 100% EXPLICATIVA, DIRETA e DIDÁTICA (sem perguntas socráticas de teste).
+    - Cita os slides e páginas exatas com chips [Pág. X].
+    - Não altera o progresso ou tentativas da trilha de raciocínio principal.
+    - Anexa a conversa na sub-thread do bloco.
+    """
+    messages = json.loads(session.messages_json or "[]")
+    
+    # Localiza a mensagem de aula à qual a dúvida está vinculada
+    parent_msg = None
+    for m in messages:
+        if m.get("id") == parent_message_id:
+            parent_msg = m
+            break
+            
+    if not parent_msg:
+        for m in reversed(messages):
+            if m.get("role") == "assistant":
+                parent_msg = m
+                break
+                
+    if not parent_msg:
+        raise ValueError("Nenhuma mensagem de aula encontrada para ancorar a dúvida.")
+        
+    topic_id = parent_msg.get("topic_id")
+    subconcept_id = parent_msg.get("subconcept_id")
+    
+    roadmap = json.loads(session.roadmap_json or "[]")
+    target_topic = None
+    target_subconcept = None
+    for t in roadmap:
+        if t.get("id") == topic_id:
+            target_topic = t
+            for s in t.get("subconcepts", []):
+                if s.get("id") == subconcept_id:
+                    target_subconcept = s
+                    break
+            break
+            
+    if not target_topic and roadmap:
+        curr_idx = min(session.current_topic_index, len(roadmap) - 1)
+        target_topic = roadmap[curr_idx]
+        if target_topic.get("subconcepts"):
+            sub_idx = min(target_topic.get("current_subconcept_index", 0), len(target_topic["subconcepts"]) - 1)
+            target_subconcept = target_topic["subconcepts"][sub_idx]
+
+    # Recupera o texto dos slides relevantes
+    source_material_text = session.source_material_text or ""
+    pages_text = retrieve_relevant_source_pages(
+        source_material_text=source_material_text,
+        current_topic=target_topic or {},
+        current_subconcept=target_subconcept,
+        max_chars=25000
+    )
+    
+    # Gerencia a thread dentro de doubt_threads da mensagem pai
+    if "doubt_threads" not in parent_msg or not isinstance(parent_msg["doubt_threads"], list):
+        parent_msg["doubt_threads"] = []
+        
+    target_thread = None
+    if thread_id:
+        for th in parent_msg["doubt_threads"]:
+            if th.get("id") == thread_id:
+                target_thread = th
+                break
+                
+    now_iso = datetime.utcnow().isoformat()
+    if not target_thread:
+        thread_id = f"thread-{uuid.uuid4().hex[:8]}"
+        target_thread = {
+            "id": thread_id,
+            "parent_message_id": parent_msg["id"],
+            "topic_id": topic_id,
+            "subconcept_id": subconcept_id,
+            "title": "Dúvida de Aula",
+            "status": "open",
+            "messages": [],
+            "created_at": now_iso,
+            "updated_at": now_iso
+        }
+        parent_msg["doubt_threads"].append(target_thread)
+        
+    # Adiciona a pergunta do estudante na thread
+    user_msg_entry = {
+        "id": f"dmsg-{uuid.uuid4().hex[:8]}",
+        "role": "user",
+        "content": user_doubt,
+        "timestamp": now_iso
+    }
+    target_thread["messages"].append(user_msg_entry)
+    target_thread["status"] = "open"
+    target_thread["updated_at"] = now_iso
+    
+    # Histórico recente da thread para manter a coesão
+    thread_history_text = "\n".join([
+        f"{'Aluno' if m.get('role') == 'user' else 'Professor'}: {m.get('content')}"
+        for m in target_thread["messages"][-6:]
+    ])
+    
+    teacher_prompt = f"""Você é o Professor Especialista do Synaptix em Sala de Aula.
+O estudante levantou a mão (✋) para tirar uma dúvida pontual sobre o conteúdo:
+TÓPICO: {target_topic.get('title') if target_topic else 'Conceito'}
+BLOCO: {target_subconcept.get('title') if target_subconcept else 'Geral'}
+
+CONTEÚDO DA AULA QUE GEROU A DÚVIDA:
+\"\"\"
+{parent_msg.get('explanation') or parent_msg.get('content') or ''}
+\"\"\"
+
+PÁGINAS DOS SLIDES PARA EMBASAR A EXPLICAÇÃO:
+\"\"\"
+{pages_text}
+\"\"\"
+
+HISTÓRICO DA DÚVIDA NESTA THREAD:
+{thread_history_text}
+
+NOVA DÚVIDA DO ESTUDANTE:
+"{user_doubt}"
+
+DIRETRIZES FUNDAMENTAIS DO 'LEVANTAR A MÃO':
+1. POSTURA 100% EXPLICATIVA, DIRETA E DIDÁTICA: Não devolva perguntas de teste! Responda à dúvida com clareza cristalina, tirando qualquer névoa de confusão.
+2. DIDÁTICA DE ALTO NÍVEL: Use analogias simples, exemplos práticos ou contra-exemplos.
+3. CITAÇÃO DE PÁGINAS: Sempre que se referir a conceitos dos slides, cite no formato [Pág. X] para que o aluno possa clicar e abrir o PDF diretamente.
+4. DIAGRAMA VISUAL (opcional): Se a dúvida envolver regras de transição, operações de conjunto, linguagens ou fluxos, forneça um código Mermaid limpo e elegante em `diagram_mermaid`. Se não for necessário, retorne null.
+5. TÍTULO RESUMIDO: Crie um título de 3 a 6 palavras sintetizando o tema da dúvida para a aba/gaveta (ex: "Fecho Positivo vs Fecho de Kleene").
+
+Retorne RIGOROSAMENTE um JSON:
+{{
+  "title": "Título curto do tema da dúvida",
+  "explanation": "Explicação completa, didática e direta...",
+  "primary_page": 18,
+  "covered_pages": [18, 19],
+  "diagram_mermaid": "flowchart TD\\n..." ou null
+}}"""
+
+    doubt_resp = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "system", "content": teacher_prompt}],
+        response_format={"type": "json_object"},
+        temperature=0.2,
+    )
+    doubt_data = json.loads(doubt_resp.choices[0].message.content or "{}")
+
+    # Atualiza o título da thread com o título inteligente gerado
+    if doubt_data.get("title") and (target_thread["title"] == "Dúvida de Aula" or len(target_thread["messages"]) <= 2):
+        target_thread["title"] = doubt_data.get("title").strip()
+
+    primary_page = doubt_data.get("primary_page")
+    slide_ref = None
+    if primary_page:
+        source_note_id = target_subconcept.get("source_note_id") if target_subconcept else None
+        source_title = target_subconcept.get("source_title") if target_subconcept else "Material"
+        slide_ref = {
+            "note_id": source_note_id,
+            "source_title": source_title,
+            "page_number": primary_page,
+            "slide_excerpt": f"Pág. {primary_page}"
+        }
+    elif parent_msg.get("slide_reference"):
+        slide_ref = parent_msg.get("slide_reference")
+
+    mermaid_code = sanitize_mermaid_syntax(doubt_data.get("diagram_mermaid"))
+
+    # Mensagem de resposta do professor na thread
+    assistant_msg_entry = {
+        "id": f"dmsg-{uuid.uuid4().hex[:8]}",
+        "role": "assistant",
+        "content": doubt_data.get("explanation", "Dúvida esclarecida."),
+        "slide_reference": slide_ref,
+        "covered_pages": doubt_data.get("covered_pages", [primary_page] if primary_page else []),
+        "diagram_mermaid": mermaid_code,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    target_thread["messages"].append(assistant_msg_entry)
+    target_thread["updated_at"] = datetime.utcnow().isoformat()
+
+    session.messages_json = json.dumps(messages)
+    if db:
+        db.commit()
+
+    return {
+        "thread": target_thread,
+        "parent_message_id": parent_msg["id"],
+        "messages": messages
+    }
+
+
+def resolve_raise_hand_doubt(
+    db: Session,
+    session: models.GuidedStudySession,
+    parent_message_id: str,
+    thread_id: str
+) -> Dict[str, Any]:
+    """
+    Marca uma dúvida levantada como resolvida ('Dúvida Esclarecida').
+    """
+    messages = json.loads(session.messages_json or "[]")
+    for msg in messages:
+        if msg.get("id") == parent_message_id:
+            for thread in msg.get("doubt_threads", []):
+                if thread.get("id") == thread_id:
+                    thread["status"] = "resolved"
+                    thread["updated_at"] = datetime.utcnow().isoformat()
+                    session.messages_json = json.dumps(messages)
+                    if db:
+                        db.commit()
+                    return {"thread": thread, "status": "resolved"}
+                    
+    return {"status": "not_found"}
 
 
 def create_synapse_in_mindmap(
