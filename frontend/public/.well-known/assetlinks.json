@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.amtheinner.synaptix",
+        "sha256_cert_fingerprints": ["06:E2:A6:AD:7F:0D:25:AE:EE:10:D5:27:2F:F6:98:46:2E:CD:61:3A:ED:A4:0A:B8:02:14:FA:B3:09:7C:28:79"]
+      }
+    }]

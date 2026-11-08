@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import type { Comment, CommentConnection } from '../types';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = '';
 
 interface CommentsState {
   comments: Comment[];
+  loadedNoteId: number | null;
+  isLoadingComments: boolean;
   connections: CommentConnection[];
   
   fetchComments: (noteId: number) => Promise<void>;
@@ -25,15 +27,19 @@ interface CommentsState {
 
 export const useCommentsStore = create<CommentsState>((set) => ({
   comments: [],
+  loadedNoteId: null,
+  isLoadingComments: false,
   connections: [],
 
   fetchComments: async (noteId) => {
+    set({ isLoadingComments: true, loadedNoteId: null });
     try {
       const res = await fetch(`${API_URL}/notes/${noteId}/comments`);
       const data = await res.json();
-      set({ comments: data });
+      set({ comments: data, loadedNoteId: noteId, isLoadingComments: false });
     } catch (error) {
       console.error('Error fetching comments', error);
+      set({ isLoadingComments: false });
     }
   },
 
@@ -131,14 +137,15 @@ export const useCommentsStore = create<CommentsState>((set) => ({
     try {
       await fetch(`${API_URL}/comments/${id}`, { method: 'DELETE' });
       set((state) => ({
-        comments: state.comments.filter((c) => c.id !== id)
+        comments: state.comments.filter((c) => c.id !== id),
+        connections: state.connections.filter((conn) => conn.source_comment_id !== id && conn.target_comment_id !== id)
       }));
     } catch (error) {
       console.error('Error deleting comment', error);
     }
   },
 
-  clearComments: () => set({ comments: [], connections: [] }),
+  clearComments: () => set({ comments: [], connections: [], loadedNoteId: null, isLoadingComments: false }),
 
   fetchNotebookConnections: async (notebookId) => {
     try {

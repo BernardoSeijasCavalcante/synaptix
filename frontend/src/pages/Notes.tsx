@@ -3,7 +3,7 @@ import { NoteEditor } from '../components/NoteEditor';
 
 export default function Notes() {
   return (
-    <div className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-slate-950">
+    <div className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-transparent">
       <Sidebar />
       <NoteEditor />
     </div>

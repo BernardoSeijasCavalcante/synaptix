@@ -1,0 +1,95 @@
+services:
+  # ============================================================================
+  # 1. Núcleo Synaptix Blindado (FastAPI + Frontend Build + AES-256-GCM)
+  # ============================================================================
+  synaptix:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: synaptix-core
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      - SYNAPTIX_BIND_HOST=0.0.0.0
+      - SYNAPTIX_BIND_PORT=8000
+      - SYNAPTIX_ENABLE_DOCS=false
+      - SYNAPTIX_ALLOWED_ORIGINS=${SYNAPTIX_ALLOWED_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000,https://synaptix.amtheinner.com}
+    # Vinculado APENAS ao loopback local (127.0.0.1) na máquina host;
+    # o tráfego externo entra exclusivamente pelo túnel criptografado cloudflared.
+    ports:
+      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:6080:8000"
+    volumes:
+      - ./backend/synaptix.db:/app/backend/synaptix.db
+      - ./backend/synaptix_team.db:/app/backend/synaptix_team.db
+      - ./backend/uploads:/app/backend/uploads
+      - ./backend/uploads_team:/app/backend/uploads_team
+      - ./backend/.env:/app/backend/.env
+      - ./backend/main.py:/app/backend/main.py
+      - ./backend/models.py:/app/backend/models.py
+      - ./backend/schemas.py:/app/backend/schemas.py
+      - ./backend/guided_study_engine.py:/app/backend/guided_study_engine.py
+      - ./backend/security:/app/backend/security
+      - ./backend/team_router.py:/app/backend/team_router.py
+      - ./backend/team_schemas.py:/app/backend/team_schemas.py
+      - ./backend/team_routes_core.py:/app/backend/team_routes_core.py
+      - ./backend/team_scope.py:/app/backend/team_scope.py
+      - ./backend/team_models.py:/app/backend/team_models.py
+      - ./frontend/dist:/app/frontend/dist
+    networks:
+      synaptix_dmz_net:
+        ipv4_address: 172.30.250.10
+    # Blindagem de Container (Anti-Escape / Isolamento do Sistema Hospedeiro)
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 1g
+    cpus: 1.5
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+
+  # ============================================================================
+  # 2. Túnel Cloudflare Zero-Trust (Exposição HTTPS TLS 1.3 sem abrir portas)
+  # ============================================================================
+  cloudflared:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    container_name: synaptix-cloudflared
+    restart: unless-stopped
+    depends_on:
+      synaptix:
+        condition: service_healthy
+    # Se CLOUDFLARE_TUNNEL_TOKEN estiver definido no .env, conecta via Token;
+    # caso contrário, utiliza o arquivo ./cloudflared/config.yml
+    command: >
+      tunnel --no-autoupdate
+      --config /etc/cloudflared/config.yml
+      run ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    networks:
+      synaptix_dmz_net:
+        ipv4_address: 172.30.250.20
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 256m
+
+networks:
+  synaptix_dmz_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.250.0/24
+          gateway: 172.30.250.1
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"

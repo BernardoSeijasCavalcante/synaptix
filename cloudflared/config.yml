@@ -1,0 +1,22 @@
+# ==============================================================================
+# Configuração do Cloudflare Tunnel (cloudflared) — Synaptix Zero-Trust
+# ==============================================================================
+# Como usar:
+# Opção 1 (Token no Painel Cloudflare Zero Trust - Mais Simples):
+#   Defina CLOUDFLARE_TUNNEL_TOKEN=<seu_token> no arquivo backend/.env e aponte
+#   a rota pública do túnel no painel Cloudflare para: http://synaptix:8000
+#
+# Opção 2 (Arquivo de credenciais local):
+#   Coloque o arquivo JSON do túnel nesta pasta (./cloudflared/credentials.json)
+#   e ajuste o hostname abaixo.
+
+protocol: quic
+no-autoupdate: true
+
+ingress:
+  # Encaminha apenas para o serviço interno isolado na rede Docker DMZ
+  - service: http://synaptix:8000
+    originRequest:
+      connectTimeout: 15s
+      noTLSVerify: false
+      httpHostHeader: localhost

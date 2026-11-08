@@ -1,0 +1,25 @@
+# Ambientes e dependências
+node_modules/
+frontend/node_modules/
+frontend/dist/
+backend/venv/
+backend/.venv/
+__pycache__/
+*.py[cod]
+
+# Segredos, Chaves Criptográficas e Tokens de Bootstrap (NUNCA VERSIONAR)
+.env
+backend/.env
+backend/BOOTSTRAP_DEVICE_TOKEN.txt
+cloudflared/*.json
+cloudflared/cert.pem
+
+# Dados persistidos criptografados
+backend/synaptix.db
+backend/synaptix.db-journal
+backend/synaptix.db-wal
+backend/uploads/
+synaptix.db
+uploads/
+logs/
+*.pid

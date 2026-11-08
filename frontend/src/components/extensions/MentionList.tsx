@@ -47,22 +47,27 @@ export const MentionList = forwardRef((props: any, ref) => {
   }));
 
   return (
-    <div className="bg-slate-800 rounded-lg shadow-xl border border-slate-700 overflow-hidden flex flex-col py-1 min-w-[200px]">
+    <div className="glass-panel bg-slate-900/95 backdrop-blur-2xl rounded-xl shadow-2xl border border-white/15 overflow-hidden flex flex-col py-1.5 min-w-[220px] z-50">
       {props.items.length ? (
-        props.items.map((item: any, index: number) => (
-          <button
-            className={`text-left px-3 py-1.5 text-sm transition-colors ${
-              index === selectedIndex ? 'bg-slate-700 text-yellow-500' : 'bg-transparent text-gray-300 hover:bg-slate-700/50'
-            }`}
-            key={index}
-            onClick={() => selectItem(index)}
-          >
-            <span className="opacity-50 mr-2 text-xs">{item.type === 'note' ? '📝' : '💬'}</span>
-            {item.label}
-          </button>
-        ))
+        props.items.map((item: any, index: number) => {
+          const isSelected = index === selectedIndex;
+          return (
+            <button
+              className={`text-left px-3 py-2 text-xs transition-colors flex items-center gap-2 ${
+                isSelected 
+                  ? 'bg-amber-500/15 text-amber-300 font-semibold border-l-2 border-amber-400 pl-2.5' 
+                  : 'bg-transparent text-slate-300 hover:bg-white/[0.06] hover:text-white'
+              }`}
+              key={index}
+              onClick={() => selectItem(index)}
+            >
+              <span className="opacity-70 text-xs">{item.type === 'note' ? '📝' : '💬'}</span>
+              <span className="truncate">{item.label}</span>
+            </button>
+          );
+        })
       ) : (
-        <div className="px-3 py-1.5 text-sm text-gray-500 italic">Nada encontrado</div>
+        <div className="px-3 py-2 text-xs text-slate-500 italic text-center">Nenhum resultado encontrado</div>
       )}
     </div>
   );

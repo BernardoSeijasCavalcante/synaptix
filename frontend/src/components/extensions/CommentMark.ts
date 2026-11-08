@@ -10,11 +10,15 @@ declare module '@tiptap/core' {
       /**
        * Set a comment mark
        */
-      setComment: (commentId: string) => ReturnType;
+      setComment: (commentId: string | number) => ReturnType;
       /**
        * Unset a comment mark
        */
-      unsetComment: (commentId: string) => ReturnType;
+      unsetComment: (commentId: string | number) => ReturnType;
+      /**
+       * Remove comment marks whose IDs are not in the validCommentIds list
+       */
+      cleanOrphanComments: (validCommentIds: (string | number)[]) => ReturnType;
     };
   }
 }
@@ -55,7 +59,7 @@ export const CommentMark = Mark.create<CommentOptions>({
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['mark', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { class: 'bg-yellow-500/30 border-b-2 border-yellow-500 rounded px-1 text-inherit' }), 0];
+    return ['mark', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { class: 'bg-amber-400/20 border-b-2 border-amber-400 rounded px-1.5 py-0.5 text-inherit shadow-[0_0_10px_rgba(234,179,8,0.15)] transition-colors hover:bg-amber-400/30 cursor-pointer' }), 0];
   },
 
   addStorage() {
@@ -80,29 +84,58 @@ export const CommentMark = Mark.create<CommentOptions>({
   addCommands() {
     return {
       setComment: (commentId) => ({ commands }) => {
-        return commands.setMark(this.name, { 'data-comment-id': commentId });
+        return commands.setMark(this.name, { 'data-comment-id': String(commentId) });
       },
       unsetComment: (commentId) => ({ tr, dispatch }) => {
         if (!dispatch) return false;
         
         const { doc } = tr;
-        
-        // If there's a selection, we could theoretically unset it in the selection.
-        // But usually we want to find the mark by ID and remove it.
-        let markRange: {from: number, to: number} | null = null;
+        const targetId = String(commentId);
+        const rangesToRemove: { from: number; to: number }[] = [];
         
         doc.descendants((node, pos) => {
+          if (!node.isInline && !node.isText) return;
           const hasMark = node.marks.find(
-            mark => mark.type.name === this.name && mark.attrs['data-comment-id'] === commentId
+            mark => mark.type.name === this.name && String(mark.attrs['data-comment-id']) === targetId
           );
           if (hasMark) {
-            markRange = { from: pos, to: pos + node.nodeSize };
+            rangesToRemove.push({ from: pos, to: pos + node.nodeSize });
           }
         });
 
-        if (markRange) {
-          const range = markRange as {from: number, to: number};
-          tr.removeMark(range.from, range.to, this.type);
+        if (rangesToRemove.length > 0) {
+          rangesToRemove.forEach(range => {
+            tr.removeMark(range.from, range.to, this.type);
+          });
+          return true;
+        }
+
+        return false;
+      },
+      cleanOrphanComments: (validCommentIds) => ({ tr, dispatch }) => {
+        if (!dispatch) return false;
+        
+        const validSet = new Set(validCommentIds.map(id => String(id)));
+        const { doc } = tr;
+        const rangesToRemove: { from: number; to: number }[] = [];
+
+        doc.descendants((node, pos) => {
+          if (!node.isInline && !node.isText) return;
+          const commentMark = node.marks.find(
+            mark => mark.type.name === this.name
+          );
+          if (commentMark) {
+            const markId = commentMark.attrs['data-comment-id'];
+            if (!markId || !validSet.has(String(markId))) {
+              rangesToRemove.push({ from: pos, to: pos + node.nodeSize });
+            }
+          }
+        });
+
+        if (rangesToRemove.length > 0) {
+          rangesToRemove.forEach(range => {
+            tr.removeMark(range.from, range.to, this.type);
+          });
           return true;
         }
 

@@ -2,29 +2,197 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: dark;
+}
+
+/* Força controles de formulário e inputs em modo escuro com alto contraste */
+input, textarea, select {
+  background-color: #080f26 !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  color-scheme: dark !important;
+  caret-color: #facc15 !important;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: #facc15 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.35) !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1 !important;
+}
+
+/* Impede que o preenchimento automático do Chrome/Edge pinte o fundo de branco */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff !important;
+  -webkit-box-shadow: 0 0 0px 1000px #080f26 inset !important;
+  box-shadow: 0 0 0px 1000px #080f26 inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+  color-scheme: dark !important;
+}
+
+@layer utilities {
+  /* Frosted Glass Core Panels */
+  .glass-panel {
+    background: rgba(10, 17, 40, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-panel-subtle {
+    background: rgba(12, 20, 48, 0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.25);
+  }
+
+  .glass-nav {
+    background: rgba(7, 12, 28, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.35);
+  }
+
+  .glass-card {
+    background: rgba(13, 22, 50, 0.55);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-card-hover {
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .glass-card-hover:hover {
+    background: rgba(20, 32, 68, 0.75);
+    border-color: rgba(234, 179, 8, 0.35);
+    box-shadow: 0 14px 34px -4px rgba(0, 0, 0, 0.5), 0 0 20px 0 rgba(234, 179, 8, 0.12), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
+  }
+
+  /* Glass Buttons */
+  .glass-btn-gold {
+    background: linear-gradient(135deg, rgba(234, 179, 8, 0.22) 0%, rgba(202, 138, 4, 0.1) 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(234, 179, 8, 0.35);
+    box-shadow: 0 2px 10px rgba(234, 179, 8, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    color: #facc15;
+    transition: all 0.2s ease;
+  }
+  .glass-btn-gold:hover {
+    background: linear-gradient(135deg, rgba(234, 179, 8, 0.35) 0%, rgba(202, 138, 4, 0.2) 100%);
+    border-color: rgba(234, 179, 8, 0.6);
+    box-shadow: 0 4px 18px rgba(234, 179, 8, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    color: #fef08a;
+  }
+
+  .glass-btn-purple {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(126, 34, 206, 0.1) 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    box-shadow: 0 2px 10px rgba(168, 85, 247, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    color: #c084fc;
+    transition: all 0.2s ease;
+  }
+  .glass-btn-purple:hover {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.35) 0%, rgba(126, 34, 206, 0.2) 100%);
+    border-color: rgba(168, 85, 247, 0.6);
+    box-shadow: 0 4px 18px rgba(168, 85, 247, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    color: #f3e8ff;
+  }
+
+  .glass-btn-ghost {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #cbd5e1;
+    transition: all 0.2s ease;
+  }
+  .glass-btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+  }
+
+  .glass-input {
+    background: rgba(9, 14, 32, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+  }
+  .glass-input:focus {
+    background: rgba(13, 21, 46, 0.8);
+    border-color: rgba(234, 179, 8, 0.45);
+    box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.15), inset 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* Custom Glass Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(7, 12, 28, 0.2);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(234, 179, 8, 0.4);
+}
+
+/* Tiptap Tables with Glass Enhancements */
 .tiptap table {
   border-collapse: collapse;
   table-layout: fixed;
   width: 100%;
-  margin: 0;
+  margin: 1.5rem 0;
   overflow: hidden;
-  border: 1px solid #334155; /* slate-700 */
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 17, 40, 0.4);
+  backdrop-filter: blur(8px);
 }
 
 .tiptap table td,
 .tiptap table th {
   min-width: 1em;
-  border: 1px solid #334155; /* slate-700 */
-  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 14px;
   vertical-align: top;
   box-sizing: border-box;
   position: relative;
 }
 
 .tiptap table th {
-  font-weight: bold;
+  font-weight: 600;
   text-align: left;
-  background-color: #0f172a; /* slate-900 */
+  background-color: rgba(15, 23, 42, 0.85);
+  color: #f1f5f9;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .tiptap table .selectedCell:after {
@@ -32,7 +200,7 @@
   position: absolute;
   content: "";
   left: 0; right: 0; top: 0; bottom: 0;
-  background: rgba(200, 200, 255, 0.1);
+  background: rgba(234, 179, 8, 0.12);
   pointer-events: none;
 }
 
@@ -42,14 +210,74 @@
   top: 0;
   bottom: -2px;
   width: 4px;
-  background-color: #eab308; /* yellow-500 */
+  background-color: #eab308;
   pointer-events: none;
 }
 
 .tiptap p.is-editor-empty:first-child::before {
-  color: #475569; /* slate-600 */
+  color: #64748b;
   content: attr(data-placeholder);
   float: left;
   height: 0;
   pointer-events: none;
 }
+
+/* Tiptap Links & Images */
+.tiptap a {
+  color: #38bdf8;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  decoration-color: rgba(56, 189, 248, 0.5);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  border-radius: 0.25rem;
+  padding: 0 2px;
+}
+
+.tiptap a:hover {
+  color: #fbbf24;
+  background-color: rgba(251, 191, 36, 0.12);
+}
+
+.tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  margin: 1rem auto;
+  display: block;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.tiptap img[data-align="left"] {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+.tiptap img[data-align="center"] {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.tiptap img[data-align="right"] {
+  margin-left: auto !important;
+  margin-right: 0 !important;
+}
+
+.tiptap img.ProseMirror-selectednode {
+  outline: 2px solid #eab308;
+  outline-offset: 3px;
+  border-color: rgba(234, 179, 8, 0.6);
+  box-shadow: 0 0 25px rgba(234, 179, 8, 0.25);
+}
+
+/* Previne que eventuais SVGs de erro soltos do compilador Mermaid vazem para o body */
+body > svg.error-icon,
+body > svg[aria-roledescription="error"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+

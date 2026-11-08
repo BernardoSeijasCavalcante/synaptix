@@ -7,17 +7,18 @@ from openai import OpenAI
 from sqlalchemy import text
 from database import SessionLocal, engine
 import models
+from security.crypto import protect_embedding_vector, sanitize_html_content
 
 # Initialize OpenAI Client (depends on OPENAI_API_KEY env var)
 client = OpenAI()
 
 def _get_embedding(text_content: str) -> list[float]:
-    """Helper function to get embedding from OpenAI."""
+    """Helper function to get embedding from OpenAI and apply cryptographic isometry protection."""
     response = client.embeddings.create(
         input=text_content,
         model="text-embedding-3-small"
     )
-    return response.data[0].embedding
+    return protect_embedding_vector(response.data[0].embedding)
 
 from typing import Optional
 
@@ -31,6 +32,12 @@ def save_note(topic: str, content: str, workspace_id: Optional[int] = None, note
         embedding = _get_embedding(f"Title: {topic}\n\nContent: {content}")
         
         with SessionLocal() as db:
+            # Se workspace_id não foi informado mas notebook_id foi, herda o workspace do caderno
+            if notebook_id and not workspace_id:
+                nb = db.query(models.Notebook).filter(models.Notebook.id == notebook_id).first()
+                if nb and nb.workspace_id:
+                    workspace_id = nb.workspace_id
+
             # 1. Create the note
             new_note = models.Note(
                 title=topic,
@@ -51,7 +58,7 @@ def save_note(topic: str, content: str, workspace_id: Optional[int] = None, note
                 )
                 conn.commit()
                 
-            return {"success": True, "note_id": new_note.id, "message": "Note saved and embedded successfully."}
+            return {"success": True, "note_id": new_note.id, "message": "Nota salva e indexada na memória com sucesso."}
             
     except Exception as e:
         return {"error": str(e)}
@@ -87,7 +94,17 @@ def search_memory(query: str, limit: int = 5) -> list[dict]:
             with SessionLocal() as db:
                 notes = db.query(models.Note).filter(models.Note.id.in_(note_ids)).all()
                 # Create a lookup dictionary and keep the order based on distance
-                notes_dict = {n.id: {"title": n.title, "content": n.content, "created_at": n.created_at.isoformat() if n.created_at else None} for n in notes}
+                notes_dict = {
+                    n.id: {
+                        "id": n.id,
+                        "title": n.title,
+                        "content": n.content,
+                        "type": n.type,
+                        "workspace_id": n.workspace_id,
+                        "notebook_id": n.notebook_id,
+                        "created_at": n.created_at.isoformat() if n.created_at else None
+                    } for n in notes
+                }
                 
                 ordered_results = []
                 for row in matches:
